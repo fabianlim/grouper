@@ -21,21 +21,24 @@
         " value is the *Integer* parameter from which we construct 
           the morphism 
         "
-        (defn ZmodN-Element[]
-          " element "
-          (let [r
-            (reify 
-              co/Morphism
-              (co/action-adaptor [x]
-                " x = this "
-                value)
-              (co/compose [x y]
-                " x = this and y = other "
-                (factory
-                  (morphism-action
-                    (co/action-adaptor x) 
-                    (co/action-adaptor y)))))]
-              (defmethod print-method (type r)
-                  [x ^java.io.Writer w]
-                (.write w (str value)))
-              r))))))
+        (let [r
+          ;; build the object and bind 
+          (reify 
+            co/Morphism
+            (co/action-adaptor [x]
+              " x = this "
+              value)
+            (co/compose [x y]
+              " x = this and y = other "
+              (factory
+                (morphism-action
+                  (co/action-adaptor x) 
+                  (co/action-adaptor y)))))]
+
+            ;; define a print-method
+            (defmethod print-method (type r)
+                [x ^java.io.Writer w]
+              (.write w (str value)))
+
+            ;; return the object
+            r)))))
