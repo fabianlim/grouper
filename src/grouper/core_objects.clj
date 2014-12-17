@@ -1,5 +1,4 @@
-(ns grouper.group)
-
+(ns grouper.core-objects)
 
 (defprotocol Category
   " Category
@@ -17,7 +16,7 @@
     ======
 
     Abstract collection of objects and an action.
-    The action induces a isomorphisms over the abstract collection.
+    The action induces isomorphisms over the abstract collection.
 
     * action [this]: Given a Monoid (this), return a function describing 
       ismorphisms between any two Monoid objects.
@@ -41,38 +40,6 @@
   (compose [this other])
   (action-adaptor [data]))
 
-
-;; inline implementation of *Integers* over N
-;; this is isomorphic *Quotient* Z / (N Z)
-;; TODO : make a generic Quotient Interface ? 
-(defrecord ZmodN [N]
-  Monoid 
-  (action [this] 
-    (defn act [x y]
-      " assumes both x and y are integers "
-      (clojure.core/mod 
-        (clojure.core/* x y)
-         (:N this))))
-
-  Category 
-  (morphism-factory [this]
-    (let [morphism-action (action this)]
-      " * morphism-action binds the action "
-      (defn factory [value]
-        " value is the *Integer* parameter from which we construct 
-          the morphism 
-        "
-        (reify 
-          Morphism
-          (action-adaptor [x]
-            " x = this "
-            value)
-          (compose [x y]
-            " x = this and y = other "
-            (morphism-action
-              (action-adaptor x) 
-              (action-adaptor y))))))))
-
 ;; generic function that returns an
 ;; TODO: what about objects that are non-morphisms?
 (defn element [obj value]
@@ -85,5 +52,3 @@
   "
   (let [factory (morphism-factory obj)]
     (factory value)))
-
-(compose (element (ZmodN. 5) 3) (element (ZmodN. 5) 2))
