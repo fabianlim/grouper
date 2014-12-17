@@ -11,34 +11,37 @@
       " assumes both x and y are integers "
       (clojure.core/mod 
         (clojure.core/* x y)
-         (:N this))))
+        (:N this))))
 
   co/Category 
   (co/morphism-factory [this]
     (let [morphism-action (co/action this)]
       " * morphism-action binds the action "
+
       (defn factory [value]
-        " value is the *Integer* parameter from which we construct 
-          the morphism 
-        "
-        (let [r
-          ;; build the object and bind 
-          (reify 
-            co/Morphism
-            (co/action-adaptor [x]
-              " x = this "
-              value)
-            (co/compose [x y]
-              " x = this and y = other "
-              (factory
-                (morphism-action
-                  (co/action-adaptor x) 
-                  (co/action-adaptor y)))))]
+        " 
+        Build the ZmodN-Element. Value is the *Integer* 
+        parameter from which we construct the morphism "
 
-            ;; define a print-method
-            (defmethod print-method (type r)
-                [x ^java.io.Writer w]
-              (.write w (str value)))
+        (let [r ;; build object and bind it
+              (reify 
+                co/Morphism
+                (co/action-adaptor [_]
+                  ;; previledged argument un-used. 
+                  ;; just return value
+                  value)
 
-            ;; return the object
-            r)))))
+                (co/compose [x y]
+                  ;; recursive definition of factory
+                  ;; uses action-adaptor
+                  (factory
+                    (morphism-action
+                      (co/action-adaptor x) 
+                      (co/action-adaptor y)))))]
+
+          (defmethod print-method (type r) [x ^java.io.Writer w] 
+            ;; further define a print method
+            (.write w (str value)))
+
+          ;; factory finally returns the object
+          r)))))
