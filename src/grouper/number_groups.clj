@@ -16,9 +16,9 @@
   co/Category 
   (co/morphism-factory [this]
     (let [morphism-action (co/action this)]
-      " * morphism-action binds the action "
+      " * morphism-action binds to the action "
 
-      (defn factory [value]
+      (defn morphism [value]
         " 
         Build the ZmodN-Element. Value is the *Integer* 
         parameter from which we construct the morphism "
@@ -26,22 +26,34 @@
         (let [r ;; build object and bind it
               (reify 
                 co/Morphism
-                (co/action-adaptor [_]
-                  ;; previledged argument un-used. 
-                  ;; just return value
-                  value)
+                  ;; morphism implementations
+                  (co/action-adaptor [_]
+                    ;; previledged argument un-used. 
+                    ;; just return value
+                    value)
 
-                (co/compose [x y]
-                  ;; recursive definition of factory
-                  ;; uses action-adaptor
-                  (factory
-                    (morphism-action
-                      (co/action-adaptor x) 
-                      (co/action-adaptor y)))))]
+                  (co/compose [x y]
+                    ;; recursive definition of morphism
+                    ;; uses action-adaptor
+                    (morphism
+                      (morphism-action
+                        (co/action-adaptor x) 
+                        (co/action-adaptor y))))
+                  Object
+                    ;; object implementations
 
-          (defmethod print-method (type r) [x ^java.io.Writer w] 
+                    (hashCode [_]
+                      ;; hashCode 
+                      (.hashCode value))
+
+                    (equals [this other]
+                      ;; equality testing
+                      (= (.hashCode this) (.hashCode other))) 
+                  )]
+
+          (defmethod print-method (type r) [_ ^java.io.Writer w] 
             ;; further define a print method
             (.write w (str value)))
 
-          ;; factory finally returns the object
+          ;; finally returns the object r
           r)))))

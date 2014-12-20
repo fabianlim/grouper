@@ -9,7 +9,11 @@
     * morphism-factory [this]: Given a category (this), return a factory 
       that constructs morphisms
   "
-  (morphism-factory [this]))
+  (morphism-factory [this])
+  (element [this value] 
+    (let [morphism (morphism-factory this)]
+      (morphism value))) 
+  )
 
 (defprotocol Monoid
   " Monoid

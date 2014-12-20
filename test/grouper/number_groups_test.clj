@@ -3,8 +3,16 @@
             [grouper.number-groups :refer :all]
             [grouper.core-objects :as co]))
 
+(defn elem [x] (co/element (->ZmodN 5) x)) 
 
-(testing "Compose"
-  (is (co/compose 
-        (co/element (->ZmodN 5) 3) 
-        (co/element (->ZmodN 5) 2)) 1))
+;; testing ZmodN
+(testing "ZmodN"
+  (let [N 5
+        elem (fn [x] (co/element (->ZmodN N) x))]
+    (is (= (co/compose 
+          (elem 3) 
+          (elem 4)) 
+          (elem 2)))
+    (is (= 1 1))))
+
+;; (reify Object)
