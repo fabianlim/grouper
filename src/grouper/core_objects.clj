@@ -10,10 +10,8 @@
       that constructs morphisms
   "
   (morphism-factory [this])
-  (element [this value] 
-    (let [morphism (morphism-factory this)]
-      (morphism value))) 
   )
+
 
 (defprotocol Monoid
   " Monoid
@@ -44,8 +42,10 @@
   (compose [this other])
   (action-adaptor [data]))
 
-;; generic function that returns an
-;; TODO: what about objects that are non-morphisms?
+;; generic function that returns an element from an object that
+;; collects other objects
+;; TODO: In the future should make this a multimethod to support
+;; other kinds of *Objects* other than *Category*
 (defn element [obj value]
   " element 
     =======

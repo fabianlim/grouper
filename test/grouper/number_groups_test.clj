@@ -13,6 +13,4 @@
           (elem 3) 
           (elem 4)) 
           (elem 2)))
-    (is (= 1 1))))
-
-;; (reify Object)
+    ))
