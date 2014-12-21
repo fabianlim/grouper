@@ -8,7 +8,9 @@
   co/Monoid 
   (co/action [this] 
     (defn act [x y]
-      " assumes both x and y are integers "
+      " Action implemented over the *Integer* *Domain* using the
+        mod operation.
+      "
       (clojure.core/mod 
         (clojure.core/* x y)
         (:N this))))
@@ -20,8 +22,12 @@
 
       (defn morphism [value]
         " 
-        Build the ZmodN-Element. Value is the *Integer* 
-        parameter from which we construct the morphism "
+        ZmodN (Element of)
+        ==============
+        
+        Implemented (parameterized) as an *Integer*. 
+        This follows from the implementation of the monoid action
+        "
 
         (let [r ;; build object and bind it
               (reify 

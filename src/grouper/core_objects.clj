@@ -12,7 +12,6 @@
   (morphism-factory [this])
   )
 
-
 (defprotocol Monoid
   " Monoid
     ======

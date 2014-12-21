@@ -11,6 +11,6 @@
         elem (fn [x] (co/element (->ZmodN N) x))]
     (is (= (co/compose 
           (elem 3) 
-          (elem 4)) 
-          (elem 2)))
+          (elem 5)) 
+          (elem 3)))
     ))
