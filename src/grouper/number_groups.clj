@@ -7,18 +7,29 @@
 (defrecord ZmodN [N]
   co/Monoid 
   (co/action [this] 
-    (defn act [x y]
+    (defn act 
       " Action implemented over the *Integer* *Domain* using the
         mod operation.
       "
-      (clojure.core/mod 
-        (clojure.core/* x y)
-        (:N this))))
+      ([x]
+       ;; TODO : good form to do this?
+       " single-arity simply takes mod"
+       (clojure.core/mod x (:N this)))
+      ([x y]
+        (act (clojure.core/+ x y)))))
+
+  (co/identity-element-impl [this]
+    0 ;; additive identity is implemented by the *Integer* 0
+  )
 
   co/Category 
   (co/morphism-factory [this]
-    (let [morphism-action (co/action this)]
-      " * morphism-action binds to the action "
+    (let [monoid-action (co/action this)]
+      " 
+        bindings
+        ========
+
+        * monoid-action binds to the action "
 
       (defn morphism [value]
         " 
@@ -33,18 +44,24 @@
               (reify 
                 co/Morphism
                   ;; morphism implementations
-                  (co/action-adaptor [_]
+                  (co/morphism-impl [_]
                     ;; previledged argument un-used. 
                     ;; just return value
                     value)
 
+                  (co/inverse [_]
+                    ;; construct the inverse element
+                    ;; bypass the previledged argument and just
+                    ;; use value
+                    (morphism (monoid-action (- value))))
+
                   (co/compose [x y]
                     ;; recursive definition of morphism
-                    ;; uses action-adaptor
+                    ;; uses morphism-impl
                     (morphism
-                      (morphism-action
-                        (co/action-adaptor x) 
-                        (co/action-adaptor y))))
+                      (monoid-action
+                        (co/morphism-impl x) 
+                        (co/morphism-impl y))))
                   Object
                     ;; object implementations
 

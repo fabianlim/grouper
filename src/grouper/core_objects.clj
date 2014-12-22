@@ -9,21 +9,29 @@
     * morphism-factory [this]: Given a category (this), return a factory 
       that constructs morphisms
   "
-  (morphism-factory [this])
-  )
+  (morphism-factory [this]))
 
 (defprotocol Monoid
   " Monoid
     ======
 
     Abstract collection of objects and an action.
-    The action induces isomorphisms over the abstract collection.
+    - the action is associative
+    - the action induces isomorphisms over the *Monoid*
+    - has an object (element) that acts as the identify
 
     * action [this]: Given a Monoid (this), return a function describing 
-      ismorphisms between any two Monoid objects.
-  "
-  (action [this]))
+      ismorphisms between any two Monoid objects.  The function operates
+      on a concrete data structure that underlies the implementation of
+      the *Monoid*
   
+    * identity-element-impl [this]: Given a *Monoid* (this), return 
+      a concrete instance of the data structure that implements the 
+      identify element 
+  "
+  (action [this])
+  (identity-element-impl [this]))
+
 (defprotocol Morphism 
   " Morphism 
     ========
@@ -33,13 +41,20 @@
     * compose [this other]: Compose a *Morphism* (this) with another
       *Morphism* (other)
 
-    * action-adaptor [this]: Used when _compose's_ implementation 
-      depends on an _action_ implemented somewhere else, and _action_
-      expects data in a different form.
-      Implement the adaptor here.
+    * data [this]: Exposes the underlying data structure. Acts as an
+      adaptor to the logic that implements the act
   "
   (compose [this other])
-  (action-adaptor [data]))
+  (morphism-impl [this])
+  (inverse [this])) 
+
+;; (defprotocol Group
+;;   " Group
+;;     =====
+;;   
+;;     Inverse action 
+;;   "
+;;   )
 
 ;; generic function that returns an element from an object that
 ;; collects other objects
@@ -55,3 +70,14 @@
   "
   (let [factory (morphism-factory obj)]
     (factory value)))
+
+(defn identity-element [obj]
+  " identity-element
+    ================
+
+    convinience function that wraps *element* to return the 
+    identity element of an Object*
+
+    * requires an implementation of the identity element
+  "
+  (element obj (identity-element-impl obj)))

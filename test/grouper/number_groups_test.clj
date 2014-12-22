@@ -13,4 +13,10 @@
           (elem 3) 
           (elem 5)) 
           (elem 3)))
+
+    (is (= (co/identity-element (->ZmodN N)) 
+           (elem 0)))
+    
+    (is (= (co/inverse (elem 2)) 
+           (elem 3)))
     ))
