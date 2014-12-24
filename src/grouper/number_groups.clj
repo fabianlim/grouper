@@ -73,10 +73,15 @@
                       ;; equality testing
                       (= (.hashCode this) (.hashCode other))) 
                   )]
+ 
+          ; TODO: this will not work for vectorized 
+          ; (defmethod print-method (type r) [_ ^java.io.Writer w] 
+          ;   ;; further define a print method
+          ;   (.write w (str value)))
 
-          (defmethod print-method (type r) [_ ^java.io.Writer w] 
+          (defmethod print-method (type r) [this ^java.io.Writer w] 
             ;; further define a print method
-            (.write w (str value)))
+            (.write w (str (co/morphism-impl this))) )
 
           ;; finally returns the object r
           r)))))
