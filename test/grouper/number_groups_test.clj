@@ -18,5 +18,4 @@
            (elem 0)))
     
     (is (= (co/inverse (elem 2)) 
-           (elem 3)))
-    ))
+           (elem 3)))))
