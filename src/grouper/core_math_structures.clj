@@ -1,4 +1,4 @@
-(ns grouper.core-objects)
+(ns grouper.core-math-structures)
 
 (defprotocol Category
   " Category
@@ -15,13 +15,13 @@
   " Monoid
     ======
 
-    Abstract collection of objects and an action.
+    Abstract collection of mathematical structures and an action.
     - the action is associative
     - the action induces isomorphisms over the *Monoid*
-    - contains a unique object that acts as the identity
+    - contains a unique math structure that acts as the identity
   
     * action [this]: Given a Monoid (this), return a function describing 
-      ismorphisms between any two Monoid objects.  The function operates
+      ismorphisms between any two Monoid structures. The function operates
       on a concrete data structure that underlies the implementation of
       the *Monoid*
   
@@ -32,11 +32,11 @@
     Notes
     =====
     - implementation of the action implicitly determines 
-      the concrete implementation of the objects. 
+      the concrete implementation of the math structures
     - e.g. additive group of Z/NZ
       * residue classes of Z mod N
       * action implementation: modulo N
-      * object implementation: integers 0, 1, .. N-1
+      * structure implementation: integers 0, 1, .. N-1
   "
 
   (action [this])
@@ -75,10 +75,9 @@
 ;;   "
 ;;   )
 
-;; generic function that returns an element from an object that
-;; collects other objects
+;; generic function that returns an element from a math struct
 ;; TODO: In the future should make this a multimethod to support
-;; other kinds of *Objects* other than *Category*
+;; other kinds of structures other than *Category*?
 (defn element [obj value]
   " element 
     =======
@@ -95,7 +94,7 @@
     ================
 
     convinience function that wraps *element* to return the 
-    identity element of an Object*
+    identity element of an math structure
 
     * requires an implementation of the identity element
   "

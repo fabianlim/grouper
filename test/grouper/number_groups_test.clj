@@ -1,7 +1,7 @@
 (ns grouper.number-groups-test
   (:require [clojure.test :refer :all]
             [grouper.number-groups :refer :all]
-            [grouper.core-objects :as co]))
+            [grouper.core-math-structures :as co]))
 
 (defn elem [x] (co/element (->ZmodN 5) x)) 
 

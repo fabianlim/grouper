@@ -1,5 +1,5 @@
 (ns grouper.number-groups
-  (:require [grouper.core-objects :as co]))
+  (:require [grouper.core-math-structures :as co]))
 
 ;; inline implementation of *Integers* over N
 ;; this is isomorphic *Quotient* Z / (N Z)
