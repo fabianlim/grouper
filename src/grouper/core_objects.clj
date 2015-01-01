@@ -53,19 +53,22 @@
       *Morphism* (other)
 
     * morphism-impl [this]: Exposes the underlying data structure that 
-      implements the morphism
+      implements the *Morphism* (this)
 
-    * inverse [this] : Returns the inverse of a *Morphism*
+    * inverse [this] : Returns the inverse of a *Morphism* (this)
     
     Notes
     =====
-    - we limit to *Morphisms* that have the same *Domain* and *Codomain*
-    - only this way we can define the *composition* between 
-      two *Morphisms* in the same protocol
+    ;; - we limit to *Morphisms* that have the same *Domain* and *Codomain*
+    ;; - only this way we can define the *composition* between 
+    ;;   two *Morphisms* in the same protocol
+    - compose works only if the *Codomain* of this equals the *Domain* of 
+      other
   "
   (compose [this other])
   (morphism-impl [this])
   (inverse [this])) 
+
 
 ;; (defprotocol Group
 ;;   " Group
@@ -119,3 +122,31 @@
 ;; (let [a (map co/element [(->ZmodN 5) (->ZmodN 3)] [2 4])
 ;;       b (map co/element [(->ZmodN 5) (->ZmodN 3)] [1 2])]
 ;;   (map co/compose a b))
+
+(defn morphism-builder [constructor impl monoid-action]
+  (reify 
+    Morphism
+    ;; morphism implementations
+    (morphism-impl [_]
+      ;; previledged argument un-used. 
+      ;; just return value
+      impl)
+
+    (compose [x y]
+      ;; recursive definition of morphism
+      ;; uses morphism-impl
+      (constructor
+        (monoid-action
+          (morphism-impl x) 
+          (morphism-impl y))))
+
+    Object
+    ;; object implementations
+
+    (hashCode [_]
+      ;; hashCode 
+      (.hashCode impl))
+
+    (equals [this other]
+      ;; equality testing
+      (= (.hashCode this) (.hashCode other)))))

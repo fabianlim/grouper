@@ -43,38 +43,14 @@
           This follows from the implementation of the monoid action "
 
         (let [r ;; build object and bind it
-              (reify 
-                co/Morphism
-                  ;; morphism implementations
-                  (co/morphism-impl [_]
-                    ;; previledged argument un-used. 
-                    ;; just return value
-                    value)
-
-                  (co/inverse [_]
-                    ;; construct the inverse element
-                    ;; bypass the previledged argument and just
-                    ;; use value
-                    (morphism (monoid-action (- value))))
-
-                  (co/compose [x y]
-                    ;; recursive definition of morphism
-                    ;; uses morphism-impl
-                    (morphism
-                      (monoid-action
-                        (co/morphism-impl x) 
-                        (co/morphism-impl y))))
-                  Object
-                    ;; object implementations
-
-                    (hashCode [_]
-                      ;; hashCode 
-                      (.hashCode value))
-
-                    (equals [this other]
-                      ;; equality testing
-                      (= (.hashCode this) (.hashCode other))) 
-                  )]
+              (co/boilerplate-morphism morphism value monoid-action)]
+          (extend-protocol co/Morphism
+            r 
+            (inverse [_] ;; construct the inverse element
+              ;; bypass the previledged argument and just
+              ;; use value
+              (morphism (monoid-action (- value))))
+            )
  
           (defmethod print-method (type r) [this ^java.io.Writer w] 
             ;; further define a print method

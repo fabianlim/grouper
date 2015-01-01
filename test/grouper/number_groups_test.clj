@@ -3,8 +3,6 @@
             [grouper.number-groups :refer :all]
             [grouper.core-objects :as co]))
 
-(defn elem [x] (co/element (->ZmodN 5) x)) 
-
 ;; testing ZmodN
 (testing "ZmodN"
   (let [N 5
