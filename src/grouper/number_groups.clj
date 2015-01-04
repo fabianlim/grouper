@@ -1,5 +1,5 @@
 (ns grouper.number-groups
-  (:require [grouper.core-objects :as co]))
+  (:require [grouper.core-math-structures :as co]))
 
 ;; inline implementation of *Integers* over N
 ;; this is isomorphic *Quotient* Z / (N Z)
@@ -29,32 +29,6 @@
 
   co/Category 
   (co/morphism-factory [this]
-    (let [monoid-action (co/action this)]
-      " bindings
-        ========
-
-        * monoid-action binds to the action "
-
-      (defn morphism [value]
-        " ZmodN (Element of)
-          =================
-        
-          Implemented (parameterized) as an *Integer*. 
-          This follows from the implementation of the monoid action "
-
-        (let [r ;; build object and bind it
-              (co/boilerplate-morphism morphism value monoid-action)]
-          (extend-protocol co/Morphism
-            r 
-            (inverse [_] ;; construct the inverse element
-              ;; bypass the previledged argument and just
-              ;; use value
-              (morphism (monoid-action (- value))))
-            )
- 
-          (defmethod print-method (type r) [this ^java.io.Writer w] 
-            ;; further define a print method
-            (.write w (str (co/morphism-impl this))) )
-
-          ;; finally returns the object r
-          r)))))
+    ;; build the morphism from using the action
+    (fn [value] 
+      (co/->MorphismFromAction value (co/action this)))))

@@ -1,4 +1,4 @@
-(ns grouper.core-objects)
+(ns grouper.core-math-structures)
 
 (defprotocol Category
   " Category
@@ -104,15 +104,6 @@
   "
   (element obj (identity-element-impl obj)))
 
-;; (defn cartesian-product [G H]
-;;   co/Monoid
-;;   (co/action [this]
-;;   )
-;;   (let [g 
-;;         
-;;         ])
-;;   [x y]
-;;   )
 
 ;; TODO : extend something like this for direct product action?
 ;; recall elements are Morphisms on a particular Domain, so this
@@ -123,30 +114,26 @@
 ;;       b (map co/element [(->ZmodN 5) (->ZmodN 3)] [1 2])]
 ;;   (map co/compose a b))
 
-(defn morphism-builder [constructor impl monoid-action]
-  (reify 
-    Morphism
-    ;; morphism implementations
-    (morphism-impl [_]
-      ;; previledged argument un-used. 
-      ;; just return value
-      impl)
+;; (extend-protocol co/Morphism
+;;   r 
+;;   (inverse [_] ;; construct the inverse element
+;;     ;; bypass the previledged argument and just
+;;     ;; use value
+;;     (morphism (monoid-action (- value))))
+;;   )
 
-    (compose [x y]
-      ;; recursive definition of morphism
-      ;; uses morphism-impl
-      (constructor
-        (monoid-action
-          (morphism-impl x) 
-          (morphism-impl y))))
+(defrecord MorphismFromAction [value monoid-action]
 
-    Object
-    ;; object implementations
+  Morphism
+  ;; morphism implementation
+  (morphism-impl [this]
+    (:value this))
 
-    (hashCode [_]
-      ;; hashCode 
-      (.hashCode impl))
-
-    (equals [this other]
-      ;; equality testing
-      (= (.hashCode this) (.hashCode other)))))
+  (compose [x y]
+    ;; recursive definition of morphism
+    ;; uses morphism-impl
+    (MorphismFromAction.
+      (monoid-action
+        (morphism-impl x) 
+        (morphism-impl y))
+      monoid-action))) ;; dont like this
