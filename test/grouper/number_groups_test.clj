@@ -4,7 +4,6 @@
             [grouper.core-group-functions :as co]  
             ))
 
-
 ;; while integers residue N can be thought of as
 ;; - integers, or
 ;; - residue classes
@@ -13,8 +12,8 @@
 ;; can apply to whatever objects we supply
 (testing "integers residue prime N"
   (let [N 5
-        [plus plus-inverse] (morphism-builder-additive-action-over-residue-integers N)
-        [mult mult-inverse] (morphism-builder-multiplicative-action-over-residue-integers N)
+        [plus plus-inverse] (action-builder-additive-action-over-residue-integers N)
+        [mult mult-inverse] (action-builder-multiplicative-action-over-residue-integers N)
         order (co/build-order-function plus) 
         ]
     (is (= (plus 3 2)0))
@@ -29,8 +28,14 @@
 
 (testing "integers residue nonprime N"
   (let [N 4
-        [_ mult-inverse] (morphism-builder-multiplicative-action-over-residue-integers N)
+        [_ mult-inverse] (action-builder-multiplicative-action-over-residue-integers N)
         ]
     (is (= (mult-inverse 2) nil))
     (is (= (mult-inverse 3) 3))
     ))
+
+(testing "product action"
+  (let [[act1 _] (action-builder-additive-action-over-residue-integers 5)
+        [act2 _] (action-builder-additive-action-over-residue-integers 4)
+        prod-act (co/build-product-action [act1 act2])]
+    (prod-act [2 3] [2 1])))

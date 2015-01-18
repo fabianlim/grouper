@@ -1,6 +1,6 @@
 (ns grouper.number-theory)
 
-(defn extended-Euclidean
+(defn extended-euclidean
   [a b]
   "
   function returns [gcd, u, v] where u * a + v *b = gcd

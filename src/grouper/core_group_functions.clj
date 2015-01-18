@@ -13,6 +13,25 @@
           (recur (action acc elem) (inc ord))))]
     (helper (action elem elem) 2))))
 
+(defn build-product-action
+  " build a product action given a list of them "
+  [actions]
+  (fn [this other]
+    (letfn 
+      [(helper [[a & acts] [t & these] [o & others]]
+         (if a
+           (do 
+             (cons (a t o) (helper acts these others)))
+           ()))]
+      (helper actions this other))))
+
+; TODO this macro is possibly a bad idea
+;; unpack-args macro 
+;; (defmacro unpack-args [f arglist]
+;;   " unpack args to function f"
+;;   `(~f ~@arglist))
+
+
 ;; (defn cartesian-product [G H]
 ;;   co/Monoid
 ;;   (co/action [this]
