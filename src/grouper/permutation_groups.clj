@@ -1,16 +1,6 @@
 (ns grouper.permutation-groups
   (:require [grouper.core-group-functions :as co]))
 
-;; <- the protocol approach, but I double I will go this way
-;; (defprotocol InjectiveMap)
-;; 
-;; ; TODO ; support for record
-;; ; - need a custom printer
-;; ; - need to enforce constraint for hashmap
-;; (defrecord Permutation [x]
-;;   InjectiveMap
-;;   )
-
 
 ; compose method for permutation morphisms
 (defn compose [this other]
@@ -28,39 +18,35 @@
 ; cyc method for permutation morphisms
 (defn cyc [& args]
   " construct permutation by specifying cycle "
-  (cyc-from-list args))
-
-; cyc method for permutation morphisms
-(defn cyc-from-list [[x & xs :as all]]
   ;; the first zipmap has one element less in xs
   ;; the last element maps to first
   ;; O(n) complexity because of the last
-  (if (nil? xs) 
-    {} ; if xs is nil, will return empty map
-    (assoc (zipmap all xs) (last xs) x)))
+  (let [[x & xs :as all] args]
+    (when (apply distinct? all)
+      (if (nil? xs) 
+        {} ; if xs is nil, will return empty map
+        (assoc (zipmap all xs) (last xs) x)))))
 
+;; cyc examples
+;; (apply cyc [1 2])
+;; (cyc 1 2 1)
 
-;; TODO write a macro to construct permutations?
-;; (reduce compose[(cyc :1 :2) (cyc :2 :3) (cyc :a :b)])
+;; cycle-notation
+;; if a cycle is improperly specified, will simply ignore it
+;; (defn cycle-notation [& args]
+;;   (reduce compose (map (partial apply cyc) args)))
 
-;; TODO ; not very useful to have such a complicated method simply to print the
-;; permutation
-; print-permutation method for permutation morphisms
-;; (defn print-permutation [p]
-;;   " "
-;;   (let [ks (keys p)
-;;         helper (fn [k kr res] 
-;;                  (if (contains? k kr) ;; if contains, might as well split here into k and rest
-;;                    (recur (p k) (rem k kr) (concat res k))
-;;                    (do 
-;;                      (println res)
-;;                      (start kr "")))
-;;                  )]))
-
-;; (cyc-from-list '(:a :b) )
-;; (cyc :a :b)
-;; (cyc [1 2] :a :b)
-;; (cyc [1 2] [:a :b])
+;; cyc-notation alternative impl
+(defn cycle-notation [& args]
+  (letfn [(update-acc [acc x]
+            (if (some #(contains? acc %) x)
+              acc
+              (into acc (apply cyc x))))
+          (helper [acc [x & xs]]
+            (if (nil? xs)
+              (update-acc acc x)
+              (recur (update-acc acc x) xs)))]
+    (helper {}  args)))
 
 ; first-cyc method for permutation morphisms
 ; TODO ; can generalize this to input a function to select the key
@@ -70,5 +56,5 @@
                  (if 
                    (contains? p-rem pt) 
                    (recur (p pt) (dissoc p-rem pt) (cons pt acc)) ; if pt is in the desconstructed perm, recur
-                   (cyc-from-list acc)))] ; otherwise, return result (cyc)
+                   (cyc-from-collection acc)))] ; otherwise, return result (cyc)
       (helper (first (keys p)) p ()))) ; the first key = starting pt

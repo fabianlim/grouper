@@ -26,7 +26,16 @@
 
   ;; first cycle
   (is (= (first-cyc (compose (cyc :c :d) (cyc :a :b))) 
-         (cyc :c :d))))
+         (cyc :c :d)))
+
+  ;; cycle-notation
+  (is (= (cycle-notation [1 2] [3 4])  
+        (compose (cyc 1 2) (cyc 3 4))))
+  
+  ;; cycle-notation will drop disjoint cycles
+  (is (= (cycle-notation [1 2] [1 4])  
+        (cyc 1 2)))
+  )
 
 ;; recursive
 ;; (reduce cyc [(cyc :1 :2) (cyc :2 :3)])
