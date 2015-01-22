@@ -28,12 +28,12 @@
   (is (= (first-cyc (compose (cyc :c :d) (cyc :a :b))) 
          (cyc :c :d)))
 
-  ;; cycle-notation
-  (is (= (cycle-notation [1 2] [3 4])  
+  ;; cyc-notation
+  (is (= (cyc-notation [1 2] [3 4])  
         (compose (cyc 1 2) (cyc 3 4))))
   
-  ;; cycle-notation will drop disjoint cycles
-  (is (= (cycle-notation [1 2] [1 4])  
+  ;; cyc-notation will drop disjoint cycles
+  (is (= (cyc-notation [1 2] [1 4])  
         (cyc 1 2)))
   )
 

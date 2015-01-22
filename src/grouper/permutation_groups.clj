@@ -21,23 +21,24 @@
   ;; the first zipmap has one element less in xs
   ;; the last element maps to first
   ;; O(n) complexity because of the last
-  (let [[x & xs :as all] args]
-    (when (apply distinct? all)
+  (when (and (not (nil? args)) (apply distinct? args))
+    (let [[x & xs] args]
       (if (nil? xs) 
         {} ; if xs is nil, will return empty map
-        (assoc (zipmap all xs) (last xs) x)))))
+        (assoc (zipmap args xs) (last xs) x)))))
 
 ;; cyc examples
 ;; (apply cyc [1 2])
-;; (cyc 1 2 1)
+;; (cyc 1 2 3)
 
-;; cycle-notation
+;; cyc-notation
 ;; if a cycle is improperly specified, will simply ignore it
-;; (defn cycle-notation [& args]
+;; (defn cyc-notation [& args]
 ;;   (reduce compose (map (partial apply cyc) args)))
 
 ;; cyc-notation alternative impl
-(defn cycle-notation [& args]
+(defn cyc-notation [& args]
+  " cycle notation convinience function "
   (letfn [(update-acc [acc x]
             (if (some #(contains? acc %) x)
               acc
@@ -49,12 +50,40 @@
     (helper {}  args)))
 
 ; first-cyc method for permutation morphisms
-; TODO ; can generalize this to input a function to select the key
-(defn first-cyc [p]
-  " extract out the 'first' cycle. What 'first' means is the first key returned after application of first "
+;; ; TODO ; can generalize this to input a function to select the key
+;; (defn first-cyc [p]
+;;   " extract out the 'first' cycle. What 'first' means is the first key returned after application of first "
+;;   (letfn [(helper [pt p-rem acc]
+;;                  (if 
+;;                    (contains? p-rem pt) 
+;;                    (recur (p pt) (dissoc p-rem pt) (cons pt acc)) ; if pt is in the desconstructed perm, recur
+;;                    (apply cyc acc)))] ; otherwise, return result (cyc)
+;;       (helper (first (keys p)) p ()))) ; the first key = starting pt
+
+; cyc-from-point for permutation morphisms
+(defn point->path [perm point]
+  " extract out the cycle that point is involved in "
   (letfn [(helper [pt p-rem acc]
-                 (if 
-                   (contains? p-rem pt) 
-                   (recur (p pt) (dissoc p-rem pt) (cons pt acc)) ; if pt is in the desconstructed perm, recur
-                   (cyc-from-collection acc)))] ; otherwise, return result (cyc)
-      (helper (first (keys p)) p ()))) ; the first key = starting pt
+                 (if (contains? p-rem pt) 
+                   (recur (perm pt) (dissoc p-rem pt) (cons pt acc)) ; if pt is in the desconstructed perm, recur
+                   acc))] ; otherwise, return result (cyc)
+      (helper point perm ()))) 
+
+(defn cyc-from-point [perm point]
+  (apply cyc (point->path perm point)))
+
+(defn delete-cyc [perm cyc]
+  " delete cyc from perm "
+   (apply dissoc perm (keys cyc)))
+
+(defn permutation->cyc-paths [p]
+  " destruct to set of cycles "
+  (if (empty? p)
+    #{}
+    (let [pp (point->path p (first (keys p)))
+          c (apply cyc pp)
+          p-rem (delete-cyc p c)]
+      ;; (conj pp (permutation->cyc-paths p-rem))
+      (conj (permutation->cyc-paths p-rem) pp))))
+
+;; (permutation->cyc-paths (cyc-notation [1 2] [3 4]))
