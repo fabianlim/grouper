@@ -61,15 +61,25 @@
 ;;       (helper (first (keys p)) p ()))) ; the first key = starting pt
 
 ; cyc-from-point for permutation morphisms
-(defn point->path [perm point]
-  " extract out the cycle that point is involved in "
-  (letfn [(helper [pt p-rem acc]
-                 (if (contains? p-rem pt) 
-                   (recur (perm pt) (dissoc p-rem pt) (cons pt acc)) ; if pt is in the desconstructed perm, recur
-                   acc))] ; otherwise, return result (cyc)
-      (helper point perm ()))) 
+(defn build-cyc-transform [aggregate-func]
+  " build a function that traces a cycle and applies some
+    aggregation on it"
+  (fn [perm point]
+    (letfn [(helper [pt p-rem acc]
+              (if (contains? p-rem pt) 
+                (recur (perm pt) (dissoc p-rem pt) (aggregate-func pt acc)) 
+                acc))] ; otherwise, return result (cyc)
+      (helper point perm [])))) 
+                ; if pt is in the desconstructed perm, recur
+
+" extract out the cycle that point is involved in "
+(def point->path (build-cyc-transform #(conj %2 %1)))
+
+" extract out the cycle (in reverse) that point is involved in "
+(def point->reverse-path (build-cyc-transform #(cons %1 %2)))
 
 (defn cyc-from-point [perm point]
+  " return the cyc that point is involved in perm "
   (apply cyc (point->path perm point)))
 
 (defn delete-cyc [perm cyc]

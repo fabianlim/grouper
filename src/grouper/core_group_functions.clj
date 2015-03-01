@@ -5,25 +5,16 @@
   " return the order of elem "
   [action]
   (fn [elem]
-    (letfn 
-      [(helper [acc ord]
-        (if 
-          (= acc elem)
-          (dec ord) ; need to reduce by 1
-          (recur (action acc elem) (inc ord))))]
-    (helper (action elem elem) 2))))
+    (loop [acc (action elem elem) ord 2]
+      (if (= acc elem)
+        (dec ord) ; need to reduce by 1
+        (recur (action acc elem) (inc ord))))))
 
 (defn build-product-action
   " build a product action given a list of them "
   [actions]
-  (fn [this other]
-    (letfn 
-      [(helper [[a & acts] [t & these] [o & others]]
-         (if a
-           (do 
-             (cons (a t o) (helper acts these others)))
-           ()))]
-      (helper actions this other))))
+  (fn [this other] 
+    (map #(%1 %2 %3) actions this other)))
 
 ; TODO this macro is possibly a bad idea
 ;; unpack-args macro 
