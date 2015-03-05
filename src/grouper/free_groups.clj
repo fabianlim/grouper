@@ -1,12 +1,16 @@
 ;; free-groups
-(ns grouper.free-groups) 
+(ns grouper.free-groups
+  (:require [clojure.pprint :as pp])) 
 
 ; simplify method for free-groups
 (defn simplify-relations [word & [relations]]
-  " simplifies words to belong in the free group
-    - cancels out neighboring elements and their inverse
-    - relations is a map that specifies what needs to be replaed 
-      - [k v] => [from to]
+  " simplifies words in the free group
+
+    Inputs
+    =====
+    word: a string representative of a word
+    relations: a map which specifies what needs to be replaced
+      e.g. [k v] => [from to]
   "
   (let [rel 
           ;; these are the relations for neutralizing an element with its inverse
@@ -28,8 +32,6 @@
           p
           (recur x))))))
 
-;; (simplify-relations "BbaAaBB")
-
 (defn inverse-word [word]
   " returns word that delivers the inverse action "
   (letfn [(toggle-case [x]
@@ -41,8 +43,6 @@
             ;; create a mapped version of toggle-case so we can use -> below
            (map #(toggle-case %) x))]
     (-> word clojure.string/reverse map-toggle-case clojure.string/join)))
-
-;; (inverse-word "BBaa")
 
 (defn follow-edge-labels-builder
   [get-next-edge get-rest-edge-seq]
@@ -56,8 +56,8 @@
       node: the starting node
     
       =====
-      Consumes the edge-label-sequence as it follows the graph.
-      Returns un-consumed part if consumption is not possible given the graph
+      - Consumes the edge-label-sequence as it follows the graph.
+      - Returns un-consumed part if consumption is not possible given the graph
     "
   (fn [graph node edge-label-sequence]
     (loop [e-seq edge-label-sequence
@@ -69,70 +69,59 @@
             (recur (get-rest-edge-seq e-seq l) xn (dec l))
             (vector x e-seq))))))
 
+;; follow-edge-labels-forward
 (def follow-edge-labels-forward 
   (follow-edge-labels-builder 
     (fn [e _] (subs e 0 1))
     (fn [e _] (subs e 1))))
 
+
+;; follow-edge-labels-backward
 (def follow-edge-labels-backward 
   (follow-edge-labels-builder 
     (fn [e l] (inverse-word (subs e (dec l) l)))
     (fn [e l] (subs e 0 (dec l)))))
 
-;; (follow-edge-labels coset-table "a" 1)
-;; (follow-edge-labels coset-table (inverse-word "a") 1)
-;; (follow-edge-labels {[1 "a"] 2} "ab" 1)
-;; (follow-edge-labels-forward {[1 "a"] 2 [1 "B"] 3} 1 "ab")
-;; (follow-edge-labels-backward {[1 "a"] 2 [1 "B"] 3} 1 "ab")
-
+;; scan-relation
 (defn scan-relation
   [graph {r :rels [nf nb] :nodes}]
-  " scan forward and backward "
+  " scan once forward and then once backward 
+    - nf is scanned forward using rels r.
+    - r is consumed to r'
+    - nb is scanned backward using r'
+    - again r' is consumed
+
+    Inputs
+    =====
+    graph: hash-map describing the Scherier graph
+    2nd arg: map of relations (rels) and nodes.
+  "
+
   (let [[vf rr] (follow-edge-labels-forward graph nf r)
         [vb rrr] (follow-edge-labels-backward graph nb rr)]
     (hash-map :rels rrr :nodes [vf vb])))
 
-;; (let [graph
-;;     {[1 "B"] 2,
-;;        [1 "A"] 1,
-;;        [1 "a"] 1,
-;;        [1 "b"] nil,
-;;        [2 "B"] nil,
-;;        [2 "b"] 1,
-;;        [2 "A"] nil,
-;;        [2 "a"] nil}]
-;;  (do 
-;;   (follow-edge-labels-forward graph 2 "bbb")
-;;   (scan-relation graph {:rels "bbb" :nodes [2 2]})))
 
-;; (scan-relation coset-table {:rels "a" :nodes [1 1]})
-;; (scan-relation {[2 "a"] 3} {:rels "a" :nodes [1 1]})
-
-;; for testing
-(let [step (Todd-Coxeter-procedure-builder ["a" "b"] ["aaa" "bbb" "abab"] ["a"])
-      initial-state {:graph {[1 "a"] nil [1 "A"] nil [1 "b"] nil [1 "B"] nil}
-                     :coset-meta {:coset-next-label 2 :coset-equivalences {1 1}}
-                     :r-queues {:unscanned (vector {:rels "a" :nodes [1 1]} 
-                                        {:rels "aaa" :nodes [1 1]} 
-                                        {:rels "bbb" :nodes [1 1]}
-                                        {:rels "abab" :nodes [1 1]})}
-                     :comment "initial"}]
-      (clojure.pprint/pprint (take 30 (iterate step initial-state))))
-
-  
-(defn Todd-Coxeter-procedure-builder 
+;; Todd-Coxeter-procedure  
+(defn build-Todd-Coxeter-procedure 
   [generators relations subgroup-relations]
+  " build the Todd-Coxeter procedure. 
+
+    Inputs 
+    ======
+    generators: vector of generators, e.g. ['a', 'b']
+    relations: vector of relations enforced by the presentation, 
+               e.g. ['aaa', 'bbb', 'abab']
+    subgroup-relations: vector of subgroup relations enforced by
+              the presentation, e.g. ['a']
+  "
+
   (fn [{:keys [graph coset-meta r-queues] :as prev-state}]
     " the state machine of Todd-Coxeter " 
-    " Todd-Coxeter procedure
-      ======================
-      - given a presentation for a group G and subgroup H
-      - finds a Caley graph of the group action on cosets of H
-    "
     (let [unfilled-entry (first (filter #(nil? (second %)) graph))  ; an entry which needs filling
           all-scanned (empty? (:unscanned r-queues))]  
-      (if (and all-scanned (nil? unfilled-entry))  ; queue empty and graph full
-        (assoc prev-state :comment "done!") ; nothing let to do, return graph
+      (if-not (and all-scanned (nil? unfilled-entry))  ; queue empty and graph full
+        ; (assoc prev-state :comment "done!") ; nothing let to do, return graph
         (let [[r-head & r-tail] (:unscanned r-queues)
               {rels :rels [nf nb] :nodes :as r-scanned}  ; scan the first unscanned item
                 (and (not all-scanned)  ; r could be nil
@@ -175,3 +164,20 @@
                     (assoc-in [:r-queues :scanned] [])
                     (assoc :comment "new-node")))))))))
 
+(defn Todd-Coxeter-procedure
+  [relations subgroup-relations]
+    " the Todd-Coxeter procedure. 
+      - given a presentation for a group G and subgroup H
+      - finds a Caley graph of the group action on cosets of H"
+    (let [all-relations (into relations subgroup-relations)
+          generators (->> all-relations 
+                          (reduce #(into %1 %2) #{})
+                          (map str))
+          initial-graph (reduce #(assoc %1 [1 %2] nil [1 (inverse-word %2)] nil) {} generators)
+          initial-queue (map #(hash-map :rels % :nodes [1 1]) all-relations)
+          initial-state {:graph initial-graph 
+                         :coset-meta {:coset-next-label 2 :coset-equivalences {1 1}}
+                         :r-queues {:unscanned initial-queue}
+                         :comment "initial"} 
+          step (build-Todd-Coxeter-procedure generators relations subgroup-relations)]
+        (take-while (comp not nil?) (iterate step initial-state)))) 
