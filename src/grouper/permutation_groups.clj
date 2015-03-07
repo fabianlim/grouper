@@ -11,9 +11,9 @@
   (let [this-k-with-v-mapped-by-other (map (fn [[k v]] [k (other v v)])  (seq this)) 
         this-v (vals this)
         other-k-out-of-range-of-this (filter (fn [[k v]] (not-any? #(= k %) this-v))  (seq other))
-        fn-filter-moved-points #(filter (fn [[k v]] (not= k v)) %)]
-    (reduce into {} [(fn-filter-moved-points this-k-with-v-mapped-by-other)
-                     (fn-filter-moved-points other-k-out-of-range-of-this)])))
+        filter-moved-points #(filter (fn [[k v]] (not= k v)) %)]
+    (reduce into {} [(filter-moved-points this-k-with-v-mapped-by-other)
+                     (filter-moved-points other-k-out-of-range-of-this)])))
 
 ; cyc method for permutation morphisms
 (defn cyc [& args]
