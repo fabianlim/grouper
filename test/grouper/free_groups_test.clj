@@ -53,15 +53,72 @@
             [1 "a"] 1,
             [1 "b"] 2,
             [3 "b"] 1}))
-  ; (pp/pprint (Todd-Coxeter-procedure ["aaa" "bbb" "abab"] ["a"]))
-  )
 
+  ;; coincidence processing
+  (let [graph
+         {[2 "b"] 3,
+          [3 "B"] 2,
+          [4 "B"] 5,
+          [4 "a"] 3,
+          [2 "a"] 6,
+          [5 "B"] 1,
+          [1 "B"] 6,
+          [6 "A"] 2,
+          [5 "b"] 4,
+          [1 "A"] 5,
+          [2 "A"] 1,
+          [6 "b"] 1,
+          [3 "A"] 4,
+          [1 "a"] 2,
+          [1 "b"] 5,
+          [5 "a"] 1}
+          coset-meta {:coset-next-label 7 
+                      :equivalences {6 2} 
+                      :process-queue (conj clojure.lang.PersistentQueue/EMPTY 6)}]
+        (is (= (nth (iterate Todd-Coxeter-process-coincidence 
+                                 {:graph graph :coset-meta coset-meta}) 5)
+                {:graph {[1 "B"] 1, [1 "A"] 1, [1 "a"] 1, [1 "b"] 1},
+                 :coset-meta
+                 {:coset-next-label 7,
+                  :equivalences {4 1, 5 1, 3 1, 2 1, 6 2},
+                  :process-queue clojure.lang.PersistentQueue/EMPTY}
+                  :comment "process 4"
+                 })))
 
-;   [2 "b"] 3,
-;   [3 "a"] 4,
-;   [4 "a"] 2,
-;   [2 "a"] 3,
-;   [4 "b"] 4,
-;   [1 "a"] 1,
-;   [1 "b"] 2,
-;   [3 "b"] 1},
+  ;; trival group
+  (is (= (:graph (last (Todd-Coxeter-procedure ["abABB" "baBAA"] [])))
+           {[1 "A"] 1,
+            [1 "a"] 1,
+            [1 "B"] 1,
+            [1 "b"] 1}))
+
+  ;; start from some initial point
+  (let [generators ["a" "b"]
+        relations ["abABB" "baBAA"]
+        machine (Todd-Coxeter-builder-state-machine generators relations [])
+        edge (fn [from e to] {[from e] to [to (inverse-word e)] from})
+        graph (reduce into  ;; initialize with these edges
+                  (vector (edge 1 "a" 2) 
+                          (edge 2 "b" 3) 
+                          (edge 3 "A" 4)
+                          (edge 4 "B" 5))) 
+        state (-> (Todd-Coxeter-builder-initial-state generators relations)
+                 (assoc-in [:coset-meta :coset-next-label] 6)
+                 (assoc :graph graph)
+                 (assoc-in [:r-queues :unscanned] 
+                           (vector 
+                             {:rel "B" :nodes [5 1] :row 5} {:rel "baBAA" :nodes [5 5] :row 5}
+                             {:rel "baBAA" :nodes [1 1] :row 1} {:rel "abABB" :nodes [1 1] :row 1}
+                             {:rel "baBAA" :nodes [2 2] :row 2} {:rel "abABB" :nodes [2 2] :row 2}
+                             {:rel "baBAA" :nodes [3 3] :row 3} {:rel "abABB" :nodes [3 3] :row 3}
+                             {:rel "baBAA" :nodes [4 4] :row 4} {:rel "abABB" :nodes [4 4] :row 4}
+                             )))
+        x (take-while (comp not nil?) (iterate machine state))]  
+    (is (= (:graph (last x))
+           {[1 "A"] 1,
+            [1 "a"] 1,
+            [1 "B"] 1,
+            [1 "b"] 1}))
+
+  ))
+
