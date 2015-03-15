@@ -176,23 +176,6 @@
           )))))))
 
 ;; Todd-Coxeter-get-unfilled-entry
-;; (defn Todd-Coxeter-get-unfilled-entry 
-;;   [graph]
-;;   " strategy for selecting the first unfilled entry 
-;;     - favor node with smaller label
-;;     - break ties using the action
-;;   "  
-;;   (let [ks (->> graph (filter #(nil? (second %))) (map first))  ;; pull out the keys that are yet filled 
-;;         str->int #(int (inverse-word (.charAt % 0)))  ;; go from str to int, inverse is because 
-;;         agg (fn [[x a :as one] [y b :as two]]         ;; upper-case ascii is smaller than lower-case
-;;               (cond 
-;;                 (= x y) (vector x (min-key str->int a b)) ;; if node equals, break tie on action
-;;                 (< x y)  one
-;;                 :else two))]
-;;     (when-not (empty? ks)
-;;       (reduce agg ks))))
-
-;; Todd-Coxeter-get-unfilled-entry
 ;; another version that looks at the relation queue and picks the relation with 
 ;; the smallest length, i.e., picks the relation which is going to complete
 ;; scanning soon

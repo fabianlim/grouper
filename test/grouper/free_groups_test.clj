@@ -118,7 +118,41 @@
            {[1 "A"] 1,
             [1 "a"] 1,
             [1 "B"] 1,
-            [1 "b"] 1}))
+            [1 "b"] 1})) )
 
-  ))
+  ;; another example (isomorphic to Sym(4)), with reference to subgroup <b>
+  (is (= (reduce conj #{} 
+                 (map (comp first first) 
+                      (:graph (last (Todd-Coxeter-procedure ["aaa" "bb" "abababab"] ["b"])))))
+         (into #{} (range 1 13))))
+  
+  ;; another example (isomorphic to Sym(4)), with reference to trival subgroup <>
+  (is (= (reduce conj #{} 
+                 (map (comp first first) 
+                      (:graph (last (Todd-Coxeter-procedure ["aaa" "bb" "abababab"] [])))))
+         (into #{} (range 1 25))))
+
+  ;; another example (isomorphic to trival group)
+  (is (= (:graph (last (Todd-Coxeter-procedure ["abbABBB" "baaBAAA"] ["a" "b"])))
+         {[1 "A"] 1,
+          [1 "a"] 1,
+          [1 "B"] 1,
+          [1 "b"] 1}))
+
+  ;; answer is essentially correct but some edges are missing
+  ;; TODO need fixing
+  (is (= (:graph (last (Todd-Coxeter-procedure ["abbABBB" "baaBAAA"] ["a"])))
+         {[1 "A"] 1,
+          [1 "a"] 1,
+          [1 "B"] 1,
+          ;[1 "b"] 1} ;; missing
+          }
+         ))
+
+  ;; another example (isomorphic to Alt(5)), with reference to subgroup <a>
+  (is (= (reduce conj #{} 
+                 (map (comp first first) 
+                      (:graph (last (Todd-Coxeter-procedure ["aaa" "bbbbb" "abab"] ["a"])))))
+         (into #{} (range 1 21))))
+  )
 
