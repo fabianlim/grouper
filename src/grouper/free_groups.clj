@@ -1,6 +1,5 @@
 ;; free-groups
-(ns grouper.free-groups
-  (:require [clojure.pprint :as pp])) 
+(ns grouper.free-groups)
 
 ; simplify method for free-groups
 (defn simplify-relations [word & [relations]]
@@ -309,5 +308,4 @@
           sm (Todd-Coxeter-builder-state-machine generators relations subgroup-relations)
           init (Todd-Coxeter-builder-initial-state generators all-relations)]
       (take-while (comp not nil?) (iterate sm init))))
-
 

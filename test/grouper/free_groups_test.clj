@@ -1,5 +1,6 @@
 (ns grouper.free-groups-test
   (:require [clojure.test :refer :all]
+            [clojure.pprint]
             [grouper.free-groups :refer :all]))
 
 
@@ -118,13 +119,14 @@
            {[1 "A"] 1,
             [1 "a"] 1,
             [1 "B"] 1,
-            [1 "b"] 1})) )
+            [1 "b"] 1})) 
+    )
 
   ;; another example (isomorphic to Sym(4)), with reference to subgroup <b>
   (is (= (reduce conj #{} 
                  (map (comp first first) 
                       (:graph (last (Todd-Coxeter-procedure ["aaa" "bb" "abababab"] ["b"])))))
-         (into #{} (range 1 13))))
+         #{1 2 3 4 5 6 7 8 9 10 11 13}))
   
   ;; another example (isomorphic to Sym(4)), with reference to trival subgroup <>
   (is (= (reduce conj #{} 
@@ -140,12 +142,11 @@
           [1 "b"] 1}))
 
   ;; answer is essentially correct but some edges are missing
-  ;; TODO need fixing
   (is (= (:graph (last (Todd-Coxeter-procedure ["abbABBB" "baaBAAA"] ["a"])))
          {[1 "A"] 1,
           [1 "a"] 1,
           [1 "B"] 1,
-          ;[1 "b"] 1} ;; missing
+          [1 "b"] 1 
           }
          ))
 

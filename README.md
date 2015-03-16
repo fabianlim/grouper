@@ -6,8 +6,7 @@ A Clojure library for computing GROUPS and PERmutations
 
 Contains the following implemented algorithms in these namespaces
 
-grouper.free-groups
-===================
+#### grouper.free-groups
 - Todd-Coxeter Algorithm
 
 ## License
