@@ -161,21 +161,14 @@
                    S (inverse-word s)
                    g (dissoc G [u S] [v s]) ;; delete the edge (v^s = u and u^S = v) 
                    w1 (g [vp s])]  ; check if w exists where vp^s = w
-                   ;; g (dissoc G [u S]) ;; delete edge u^S = v first
-                   ;; check w exists where w^S = vp (there is only one if it
-                   ;; does exist)
-                   ;; [w2] (filter #(= (g [% S]) vp) (range 1 coset-next-label))]
-              (if
-                (not (nil? w1))  ;; does not exist any w where vp^s = w
+              (if (not (nil? w1))  ;; does not exist any w where vp^s = w
                   (recur entrys g (Todd-Coxeter-merge w1 up cm))  ;; merge w = vp^s with up
                   ; or else vp^s and up^S are not defined
                   (recur entrys (assoc g [vp s] up [up S] vp) cm)
-                ;; (not (nil? w2))  ;; does not exist any w where w^S = vp
-                ;;   (recur entrys g (Todd-Coxeter-merge w2 up cm))    ;; merge w where w^S = vp with up
           )))))))
 
 ;; Todd-Coxeter-get-unfilled-entry
-;; another version that looks at the relation queue and picks the relation with 
+;; looks at the relation queue and picks the relation with 
 ;; the smallest length, i.e., picks the relation which is going to complete
 ;; scanning soon
 (defn Todd-Coxeter-get-unfilled-entry 

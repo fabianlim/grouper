@@ -27,27 +27,36 @@
         {} ; if xs is nil, will return empty map
         (assoc (zipmap args xs) (last xs) x)))))
 
-;; cyc examples
-;; (apply cyc [1 2])
-;; (cyc 1 2 3)
+; recursive version of cyc
+; (defn cyc [& args]
+;   " cycle notation convinience function "
+;   (if (or (< (count args) 2) (not (apply distinct? args)))
+;     (hash-map) 
+;     (loop [perm {}
+;            [x & xs] args
+;            px nil]
+;         (if (nil? x) 
+;           (-> perm (assoc x (perm nil)) (dissoc nil))
+;           (recur (assoc perm px x) xs x)))))
 
 ;; cyc-notation
 ;; if a cycle is improperly specified, will simply ignore it
 ;; (defn cyc-notation [& args]
 ;;   (reduce compose (map (partial apply cyc) args)))
 
+;; inverse 
+(def inverse clojure.set/map-invert)
+
 ;; cyc-notation alternative impl
 (defn cyc-notation [& args]
-  " cycle notation convinience function "
-  (letfn [(update-acc [acc x]
-            (if (some #(contains? acc %) x)
-              acc
-              (into acc (apply cyc x))))
-          (helper [acc [x & xs]]
-            (if (nil? xs)
-              (update-acc acc x)
-              (recur (update-acc acc x) xs)))]
-    (helper {}  args)))
+  (loop [acc (hash-map)
+         [x & xs] args]
+    (if (nil? x)
+      acc
+      (recur (if (some #(contains? acc %) x)
+             acc
+             (into acc (apply cyc x)))
+           xs))))
 
 ; first-cyc method for permutation morphisms
 ;; ; TODO ; can generalize this to input a function to select the key
@@ -60,22 +69,23 @@
 ;;                    (apply cyc acc)))] ; otherwise, return result (cyc)
 ;;       (helper (first (keys p)) p ()))) ; the first key = starting pt
 
-; cyc-from-point for permutation morphisms
 (defn build-cyc-transform [aggregate-func]
   " build a function that traces a cycle and applies some
     aggregation on it"
   (fn [perm point]
-    (letfn [(helper [pt p-rem acc]
-              (if (contains? p-rem pt) 
-                (recur (perm pt) (dissoc p-rem pt) (aggregate-func pt acc)) 
-                acc))] ; otherwise, return result (cyc)
-      (helper point perm [])))) 
-                ; if pt is in the desconstructed perm, recur
-
+    (loop [pt point
+           p-rem perm
+           acc (vector)]
+      (if (contains? p-rem pt) 
+        (recur (perm pt) (dissoc p-rem pt) (aggregate-func pt acc)) 
+        acc))))   ; otherwise, return result (cyc)
+      
 " extract out the cycle that point is involved in "
+;; TODO: this returns a vector
 (def point->path (build-cyc-transform #(conj %2 %1)))
 
 " extract out the cycle (in reverse) that point is involved in "
+;; TODO: this returns a list
 (def point->reverse-path (build-cyc-transform #(cons %1 %2)))
 
 (defn cyc-from-point [perm point]
@@ -93,7 +103,4 @@
     (let [pp (point->path p (first (keys p)))
           c (apply cyc pp)
           p-rem (delete-cyc p c)]
-      ;; (conj pp (permutation->cyc-paths p-rem))
       (conj (permutation->cyc-paths p-rem) pp))))
-
-;; (permutation->cyc-paths (cyc-notation [1 2] [3 4]))
