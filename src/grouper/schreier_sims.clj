@@ -98,14 +98,17 @@
          [b & bs] base  ; base element
          S sgs
          lvl 1]
-    (if (empty? g) 
-      true
-      (let [x (get g b b)  ;; image of b under g
-            generators (SGS-generators S)  
-            sv (Schreier-vector b generators)
-            cl (Schreier-vector-coset-leader generators sv x) ]
-        (if-not (contains? sv x)
-          false
-          (recur (pg/compose (pg/inverse cl) g) bs
-            (filter #(> (:lvl %) lvl) S)    
-            (inc lvl)))))))
+    (cond (empty? g) 
+        true
+      (nil? b)
+        false
+      :else
+        (let [x (get g b b)  ;; image of b under g
+              generators (SGS-generators S)  
+              sv (Schreier-vector b generators)
+              cl (Schreier-vector-coset-leader generators sv x) ]
+          (if-not (contains? sv x)
+            false
+            (recur (pg/compose (pg/inverse cl) g) bs
+              (filter #(> (:lvl %) lvl) S)    
+              (inc lvl)))))))
