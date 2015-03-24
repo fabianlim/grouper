@@ -56,9 +56,10 @@
                          {:lvl 2 :gens {"b" (pg/cyc-notation [2 6] [3 5])
                                             }})}
         ]
-    (is (true? (BSGS-check-group-membership Dihedral6 (pg/cyc-notation [1 2 3 4 5 6])))
-    (is (false? (BSGS-check-group-membership Dihedral6 (pg/cyc-notation [1 2 3 4])))
-                    ))))
+    (is (true? (BSGS-check-group-membership Dihedral6 (pg/cyc-notation [1 2 3 4 5 6]))))
+    (is (false? (BSGS-check-group-membership Dihedral6 (pg/cyc-notation [1 2 3 4]))))
+    (is (true? (BSGS-check-group-membership Dihedral6 (pg/cyc-notation [2 6] [3 5]))))
+    ))
     
 (testing "BSGS Mathieu11"
   (let [Mathieu11 {:base (vector 1 2 3 4)
@@ -72,6 +73,5 @@
                                         "g" (pg/cyc-notation [4 11 6 5] [7 8 10 9])
                                             }})}]
     (is (false? (BSGS-check-group-membership Mathieu11 (pg/cyc-notation [1 2 3 4 5 6]))))
-    (is (true? (BSGS-check-group-membership Mathieu11 (pg/cyc-notation [4 11 6 5] [7 8 10 9])))
-    ;; (is (false? (BSGS-check-group-membership Dihedral6 (pg/cyc-notation [1 2 3 4])))
-                    )))
+    (is (true? (BSGS-check-group-membership Mathieu11 (pg/cyc-notation [4 11 6 5] [7 8 10 9]))))
+                    ))

@@ -112,3 +112,13 @@
             (recur (pg/compose (pg/inverse cl) g) bs
               (filter #(> (:lvl %) lvl) S)    
               (inc lvl)))))))
+
+;; BSGS-random-element
+(defn BSGS-random-element
+  [{:keys [base sgs] :as bsgs}]
+  (let [sv-chain (Schreier-vector-chain bsgs)
+        generators (SGS-generators sgs)
+        select (fn [x] 
+                 (Schreier-vector-coset-leader generators
+                   (sv-chain x) (rand-nth (keys (sv-chain x)))))]
+    (reduce pg/compose (map select (reverse base)))))
