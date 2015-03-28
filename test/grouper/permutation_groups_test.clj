@@ -1,5 +1,6 @@
 (ns grouper.permutation-groups-test
   (:require [clojure.test :refer :all]
+            [clojure.set]
             [grouper.permutation-groups :refer :all]))
 
 (testing "permutation groups"
@@ -34,7 +35,7 @@
   
   ;; cyc-notation will drop non-disjoint cycles
   (is (= (cyc-notation [1 2] [1 4])  
-        (cyc 1 2)))
+       (cyc 1 2)))
   )
 
 ;; recursive

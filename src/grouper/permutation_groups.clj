@@ -69,7 +69,8 @@
 ;;                    (apply cyc acc)))] ; otherwise, return result (cyc)
 ;;       (helper (first (keys p)) p ()))) ; the first key = starting pt
 
-(defn build-cyc-transform [aggregate-func]
+;; build-cyc-transform
+(defn- build-cyc-transform [aggregate-func]
   " build a function that traces a cycle and applies some
     aggregation on it"
   (fn [perm point]
@@ -88,14 +89,17 @@
 ;; TODO: this returns a list
 (def point->reverse-path (build-cyc-transform #(cons %1 %2)))
 
+;; cyc-from-point
 (defn cyc-from-point [perm point]
   " return the cyc that point is involved in perm "
   (apply cyc (point->path perm point)))
 
+;; delete-cyc
 (defn delete-cyc [perm cyc]
   " delete cyc from perm "
    (apply dissoc perm (keys cyc)))
 
+;; permutation->cyc-paths
 (defn permutation->cyc-paths [p]
   " destruct to set of cycles "
   (if (empty? p)
