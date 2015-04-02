@@ -83,7 +83,15 @@
 ;; Schreier-vector-coset-leader
 (defn Schreier-vector-coset-leader
   [generators sv point]
-  " compute the Schreier-vector coset leader " 
+  " compute the Schreier-vector coset leader 
+
+    Inputs
+    ======
+    generators: hash-map of generators
+      e.g. {'a' {2 1, 1 2}, 'b' {4 3, 3 4}, 'c' {3 2, 2 3}}
+    sv: Schreier-vector w.r.t. generators and some base
+    point: this point is moved under action of generators
+  " 
   (->> point
        (Schrerier-vector-point->root sv)
        (map :gen)
@@ -122,3 +130,117 @@
                  (Schreier-vector-coset-leader generators
                    (sv-chain x) (rand-nth (keys (sv-chain x)))))]
     (reduce pg/compose (map select (reverse base)))))
+
+
+(defn order-gens-wrt-base 
+  [base gens]
+  " label generators to which level they belong to " 
+  (loop [[b & bs] base
+          B []
+          S (set gens)
+          i 1
+          ord-gens (vector)]
+    (if (nil? b) 
+      ord-gens
+      (let [B-ext (conj B b) ;; extend 
+            gens (clojure.set/select #(pg/pointwise-stabilizer? % B-ext) S)]
+        (recur bs 
+               B-ext
+               (clojure.set/difference S gens)
+               (inc i)
+               (conj ord-gens {:lvl i :gens gens}))))))
+
+;; partial-BSGS
+(defn partial-BSGS
+  [base-points SGS-perms generating-set]
+  " compute a partial-BSGS
+
+    a partial-BSGS satisfies the following:
+    * contains a generating set
+    * closed under inversion
+    * all permutations must not fix (pointwise?) every element in the base
+
+    Inputs
+    ======
+    base-points: vector of points to include in the base
+    SGS-perms: set of permutations to include in the SGS
+    generating-set: generating set that the partial-BSGS will contain
+  " 
+  (let [T (->> (clojure.set/union (set SGS-perms) (set generating-set))
+                (remove #(= % {})))] ;; remove identity perm
+    (loop [[s & ss] T
+            S T
+            B base-points]
+      (if (nil? s)
+        {:base B :sgs S}
+        (let [base-as-set (set B)]
+          (recur ss 
+                 (cons (pg/inverse s) S)
+                 (if (pg/pointwise-stabilizer? s B)  ;; check if need to extend base
+                   (conj B
+                     (first (filter #(not (contains? base-as-set %)) (keys s))))
+                   B))))))))
+
+
+; (def T (partial-BSGS [] [] (vector (pg/cyc-notation [1 2])
+;                             (pg/cyc-notation [2 3])
+;                             (pg/cyc-notation [3 4])
+;                             )))
+
+; (clojure.pprint/pprint T)
+; (let [{:keys [base sgs]} T]
+;   (order-gens-wrt-base base sgs))
+
+; TODO: will ignore remainder of set if there are more than 
+; 26 generators in that set
+(defn- label-generators
+  [generator-set]
+  " utility function to label generators using
+    alphabets a-z "
+
+  (loop [n 1
+         [s & ss] generator-set
+         labeled-gens (hash-map)]
+     (cond 
+       (or (nil? s) (> n 26))
+         (clojure.set/map-invert labeled-gens)
+       (contains? labeled-gens s)  ;; skip non-unique gens
+         (recur n ss labeled-gens)
+       :else
+         (recur (inc n) ss
+                (assoc labeled-gens s (str (char (+ 96 n))))))))
+
+(defn Schreier-point->generators
+  [generators sv point]
+  " compute the Schreier generators under action of generators on point 
+    
+    Inputs
+    ======
+    generators: hash-map of generators
+      e.g. {'a' {2 1, 1 2}, 'b' {4 3, 3 4}, 'c' {3 2, 2 3}}
+    sv: Schreier-vector w.r.t. generators and some base
+    point: this point is moved under action of generators
+  " 
+
+  (let [images (map #(% point point) (vals generators))
+        coset-leader ;; not this gives element mapping x->base
+          (fn [x] (Schreier-vector-coset-leader generators sv x))
+        coset-leader-point ((comp pg/inverse coset-leader) point)]
+    (filter (comp not empty?) ;; take out identity elements
+      (map (fn [s image-s] 
+            (-> (pg/compose coset-leader-point s)
+                (pg/compose (coset-leader image-s))))
+           (vals generators) images))))
+
+(defn Schreier-generators
+  [generators sv]
+  (reduce  ;; (keys sv) is really the orbit
+    #(into %1 (Schreier-point->generators S sv %2)) #{} (keys sv)))
+
+; (let [S (label-generators 
+;           (vector (pg/cyc 1 2) (pg/cyc 2 3) (pg/cyc 3 4)))
+;       b 3
+;       sv (Schreier-vector b S)]
+;     (reduce 
+;       #(into %1 (Schreier-point->generators S sv %2)) #{} (keys sv))
+;   )

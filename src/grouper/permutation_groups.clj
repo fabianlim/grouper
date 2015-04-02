@@ -108,3 +108,10 @@
           c (apply cyc pp)
           p-rem (delete-cyc p c)]
       (conj (permutation->cyc-paths p-rem) pp))))
+
+;; pointwise-stabilizer?
+(defn pointwise-stabilizer? 
+  [p S]
+  " is permutation p a pointwise stabilizer of points S " 
+    (= (map #(p % %) S) S))  
+
