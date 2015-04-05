@@ -42,18 +42,25 @@
   [{:keys [base sgs]}]
   " construct chain of Schreier vectors for a bsgs 
 
-    e.g. for Sym4 with base (1 2 3) and sgs [(1, 2), (2, 3), (3, 4)]
-      
-      - chain of Schreier vectors
-        {3 {4 {:from 3, :gen 'c'}, 3 {:gen nil, :from nil}},
-         2
-         {4 {:from 3, :gen 'c'},
-          3 {:from 2, :gen 'b'},
-          2 {:gen nil, :from nil}},
-         1
-         {4 {:from 3, :gen 'c'},
-          3 {:from 2, :gen 'b'},
-          2 {:from 1, :gen 'a'}, 1 {:gen nil, :from nil}}}
+    Inputs
+    ======
+    e.g. 
+    base: [1 2 3]
+    sgs:  [{:lvl 1 :gens {'a' (pg/cyc-notation [1 2])}}
+           {:lvl 2 :gens {'b' (pg/cyc-notation [2 3])}}
+           {:lvl 3 :gens {'c' (pg/cyc-notation [3 4])}}]
+    Outputs
+    =======
+    - chain of Schreier vectors
+      {3 {4 {:from 3, :gen 'c'}, 3 {:gen nil, :from nil}},
+       2
+       {4 {:from 3, :gen 'c'},
+        3 {:from 2, :gen 'b'},
+        2 {:gen nil, :from nil}},
+       1
+       {4 {:from 3, :gen 'c'},
+        3 {:from 2, :gen 'b'},
+        2 {:from 1, :gen 'a'}, 1 {:gen nil, :from nil}}}
   " 
   (loop [n 1
          [b & bs] base
@@ -172,20 +179,15 @@
             S T
             B base-points]
       (if (nil? s)
-        {:base B :sgs S}
+        {:base B :sgs (distinct S)}
         (let [base-as-set (set B)]
           (recur ss 
                  (cons (pg/inverse s) S)
                  (if (pg/pointwise-stabilizer? s B)  ;; check if need to extend base
                    (conj B
                      (first (filter #(not (contains? base-as-set %)) (keys s))))
-                   B))))))))
+                   B)))))))
 
-
-; (def T (partial-BSGS [] [] (vector (pg/cyc-notation [1 2])
-;                             (pg/cyc-notation [2 3])
-;                             (pg/cyc-notation [3 4])
-;                             )))
 
 ; (clojure.pprint/pprint T)
 ; (let [{:keys [base sgs]} T]
@@ -194,21 +196,28 @@
 ; TODO: will ignore remainder of set if there are more than 
 ; 26 generators in that set
 (defn- label-generators
-  [generator-set]
   " utility function to label generators using
-    alphabets a-z "
-
-  (loop [n 1
-         [s & ss] generator-set
-         labeled-gens (hash-map)]
-     (cond 
-       (or (nil? s) (> n 26))
-         (clojure.set/map-invert labeled-gens)
-       (contains? labeled-gens s)  ;; skip non-unique gens
-         (recur n ss labeled-gens)
-       :else
-         (recur (inc n) ss
-                (assoc labeled-gens s (str (char (+ 96 n))))))))
+    alphabets a-z 
+    
+    Inputs
+    ======
+    generator-set: vector of generators 
+    label-start: string of starting label, e.g. 'a', 'b', etc
+  "
+  ([generator-set label-start]
+    (loop [n label-start
+           [s & ss] generator-set
+           labeled-gens (hash-map)]
+       (cond 
+         (or (nil? s) (> n 26))
+           (clojure.set/map-invert labeled-gens)
+         (contains? labeled-gens s)  ;; skip non-unique gens
+           (recur n ss labeled-gens)
+         :else
+           (recur (inc n) ss
+                  (assoc labeled-gens s (str (char (+ 96 n))))))))
+  ([generating-set]
+   (label-generators generating-set 1)))
 
 (defn Schreier-point->generators
   [generators sv point]
@@ -234,13 +243,49 @@
 
 (defn Schreier-generators
   [generators sv]
-  (reduce  ;; (keys sv) is really the orbit
-    #(into %1 (Schreier-point->generators S sv %2)) #{} (keys sv)))
+  " compute all the Schreier generators using the orbit from a Scherier vector 
 
-; (let [S (label-generators 
-;           (vector (pg/cyc 1 2) (pg/cyc 2 3) (pg/cyc 3 4)))
-;       b 3
-;       sv (Schreier-vector b S)]
-;     (reduce 
-;       #(into %1 (Schreier-point->generators S sv %2)) #{} (keys sv))
-;   )
+    Inputs
+    ======
+    generators: hash-map of generators
+      e.g. {'a' {2 1, 1 2}, 'b' {4 3, 3 4}, 'c' {3 2, 2 3}}
+    sv: Schreier-vector w.r.t. generators and some base
+  "
+  (reduce  ;; (keys sv) is really the orbit
+    #(into %1 (Schreier-point->generators generators sv %2)) #{} (keys sv)))
+
+
+;; (def T (partial-BSGS [] [] (vector (pg/cyc-notation [1 2])
+;;                             (pg/cyc-notation [2 3])
+;;                             (pg/cyc-notation [3 4])
+;;                             )))
+
+
+; (clojure.pprint/pprint (take 4 (iterate Schreier-procedure 
+;   {:base [] :sgs []
+;    :base-stabilizers (label-generators (vector (pg/cyc 1 2) (pg/cyc 2 3) (pg/cyc 3 4)))})))
+
+(defn Schreier-procedure
+  [{:keys [base sgs base-stabilizers]}]
+  " 
+    Inputs
+    ======
+    base: set of base points, e.g. []
+    base-stabilizers hash-map of generators that are pointwise-stabilizers of base
+      e.g. {'a' {2 1, 1 2}, 'b' {4 3, 3 4}, 'c' {3 2, 2 3}}
+  " 
+  (let [[label perm] (first base-stabilizers)
+        b (first (keys perm))  ;; will extend base to point b
+        sv (Schreier-vector b base-stabilizers)  ;; compute Schreier-vector of gens wrt b
+        lvl-gens (filter #(not (pg/pointwise-stabilizer? (second %) [b])) base-stabilizers)  ;new level gens
+        Gstab (Schreier-generators base-stabilizers sv)  ;; compute Schreier-generators of new stabilizer
+        gen-label (apply min (map #(- (int (.charAt % 0)) 96) (keys base-stabilizers)))
+        new-gen-label (+ gen-label (count lvl-gens))
+        ]
+    {:base 
+      (if (nil? b) base (conj base b))
+     :sgs 
+      (conj sgs {:lvl (inc (count base)) 
+                 :gens (label-generators (vals lvl-gens) gen-label)})  ;; have to relabel the gens
+     :base-stabilizers (label-generators (seq Gstab) new-gen-label)
+     }))
