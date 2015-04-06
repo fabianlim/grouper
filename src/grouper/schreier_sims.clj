@@ -85,7 +85,7 @@
     (if (nil? (:from (sv x)))  ;; returns empty vector if x not in sv
       path
       (let [{:keys [gen from]} (sv x)]
-        (recur from (conj path {:point x :gen gen}))))))
+        (recur from (cons {:point x :gen gen} path))))))
 
 ;; Schreier-vector-coset-leader
 (defn Schreier-vector-coset-leader
@@ -232,14 +232,24 @@
   " 
 
   (let [images (map #(% point point) (vals generators))
-        coset-leader ;; not this gives element mapping x->base
+        coset-leader ;; note: this gives element mapping x->base
           (fn [x] (Schreier-vector-coset-leader generators sv x))
-        coset-leader-point ((comp pg/inverse coset-leader) point)]
+        coset-leader-point (coset-leader point)]
+    ; (println "imags" images)
+    ; (println "coset-leader-point" coset-leader-point)
+    ; (println "g" (first (vals generators)))
+    ; (println "g2" (coset-leader 8))
+    ; (println "compose" (pg/compose (first (vals generators)) (pg/inverse (coset-leader 8))))
     (filter (comp not empty?) ;; take out identity elements
       (map (fn [s image-s] 
             (-> (pg/compose coset-leader-point s)
-                (pg/compose (coset-leader image-s))))
-           (vals generators) images))))
+                (pg/compose (pg/inverse (coset-leader image-s)))))
+           (vals generators) images))
+    ; (map (fn [s image-s] 
+    ;       (-> (pg/compose coset-leader-point s)
+    ;           (pg/compose (pg/inverse (coset-leader image-s)))))
+    ;      (vals generators) images) 
+    ))
 
 (defn Schreier-generators
   [generators sv]
@@ -260,22 +270,40 @@
 ;;                             (pg/cyc-notation [3 4])
 ;;                             )))
 
-
 ; (clojure.pprint/pprint (take 4 (iterate Schreier-procedure 
 ;   {:base [] :sgs []
 ;    :base-stabilizers (label-generators (vector (pg/cyc 1 2) (pg/cyc 2 3) (pg/cyc 3 4)))})))
+
+
+; (let [gens {"a" (pg/cyc-notation [1 10] [2 8] [3 11] [5 7]) 
+;            "b" (pg/cyc-notation [1 4 7 6] [2 11 10 9])}
+;       sv (Schreier-vector 1 gens)
+;       ]
+;   (clojure.pprint/pprint (nth (iterate Schreier-procedure 
+;     {:base [] :sgs []
+;      :base-stabilizers gens}) 3))
+;   ; (clojure.pprint/pprint (keys sv))
+;   ; (clojure.pprint/pprint sv)
+;   ; (clojure.pprint/pprint (Schreier-point->generators gens sv 2))
+;   ; (clojure.pprint/pprint (Schreier-generators gens sv))
+;   ; (Schreier-vector-coset-leader gens sv 9)
+;   ; (Schrerier-vector-point->root sv 9)
+;   )
 
 (defn Schreier-procedure
   [{:keys [base sgs base-stabilizers]}]
   " 
     Inputs
     ======
-    base: set of base points, e.g. []
-    base-stabilizers hash-map of generators that are pointwise-stabilizers of base
-      e.g. {'a' {2 1, 1 2}, 'b' {4 3, 3 4}, 'c' {3 2, 2 3}}
+    a hash-map containing the following keys:
+    - base: set of base points, e.g. []
+    - sgs:  strong generating set
+    - base-stabilizers: hash-map of generators that are pointwise-stabilizers of base, to be included
+        into the BSGS
+        e.g. {'a' {2 1, 1 2}, 'b' {4 3, 3 4}, 'c' {3 2, 2 3}}
   " 
-  (let [[label perm] (first base-stabilizers)
-        b (first (keys perm))  ;; will extend base to point b
+  (let [not-in-base (fn [x] (filter #(not (contains? (set base) %)) x))  ;; function to reject those in base
+        [b] (reduce #(vector (apply min (concat %1 (-> %2 keys not-in-base)))) nil (vals base-stabilizers))
         sv (Schreier-vector b base-stabilizers)  ;; compute Schreier-vector of gens wrt b
         lvl-gens (filter #(not (pg/pointwise-stabilizer? (second %) [b])) base-stabilizers)  ;new level gens
         Gstab (Schreier-generators base-stabilizers sv)  ;; compute Schreier-generators of new stabilizer
