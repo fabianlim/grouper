@@ -179,7 +179,7 @@
             S T
             B base-points]
       (if (nil? s)
-        {:base B :sgs (distinct S)}
+        {:base B :generating-set S}
         (let [base-as-set (set B)]
           (recur ss 
                  (cons (pg/inverse s) S)
@@ -235,21 +235,11 @@
         coset-leader ;; note: this gives element mapping x->base
           (fn [x] (Schreier-vector-coset-leader generators sv x))
         coset-leader-point (coset-leader point)]
-    ; (println "imags" images)
-    ; (println "coset-leader-point" coset-leader-point)
-    ; (println "g" (first (vals generators)))
-    ; (println "g2" (coset-leader 8))
-    ; (println "compose" (pg/compose (first (vals generators)) (pg/inverse (coset-leader 8))))
     (filter (comp not empty?) ;; take out identity elements
       (map (fn [s image-s] 
             (-> (pg/compose coset-leader-point s)
                 (pg/compose (pg/inverse (coset-leader image-s)))))
-           (vals generators) images))
-    ; (map (fn [s image-s] 
-    ;       (-> (pg/compose coset-leader-point s)
-    ;           (pg/compose (pg/inverse (coset-leader image-s)))))
-    ;      (vals generators) images) 
-    ))
+           (vals generators) images))))
 
 (defn Schreier-generators
   [generators sv]
@@ -275,20 +265,29 @@
 ;    :base-stabilizers (label-generators (vector (pg/cyc 1 2) (pg/cyc 2 3) (pg/cyc 3 4)))})))
 
 
-; (let [gens {"a" (pg/cyc-notation [1 10] [2 8] [3 11] [5 7]) 
-;            "b" (pg/cyc-notation [1 4 7 6] [2 11 10 9])}
-;       sv (Schreier-vector 1 gens)
-;       ]
-;   (clojure.pprint/pprint (nth (iterate Schreier-procedure 
-;     {:base [] :sgs []
-;      :base-stabilizers gens}) 3))
-;   ; (clojure.pprint/pprint (keys sv))
-;   ; (clojure.pprint/pprint sv)
-;   ; (clojure.pprint/pprint (Schreier-point->generators gens sv 2))
-;   ; (clojure.pprint/pprint (Schreier-generators gens sv))
-;   ; (Schreier-vector-coset-leader gens sv 9)
-;   ; (Schrerier-vector-point->root sv 9)
-;   )
+;; (let [gens {"a" (pg/cyc-notation [1 10] [2 8] [3 11] [5 7]) 
+;;            "b" (pg/cyc-notation [1 4 7 6] [2 11 10 9])}
+;;       sv (Schreier-vector 1 gens)
+;;       ]
+;;   (clojure.pprint/pprint (nth (iterate Schreier-procedure 
+;;     {:base [] :sgs []
+;;      :base-stabilizers gens}) 3))
+;;   ; (clojure.pprint/pprint (keys sv))
+;;   ; (clojure.pprint/pprint sv)
+;;   ; (clojure.pprint/pprint (Schreier-point->generators gens sv 2))
+;;   ; (clojure.pprint/pprint (Schreier-generators gens sv))
+;;   ; (Schreier-vector-coset-leader gens sv 9)
+;;   ; (Schrerier-vector-point->root sv 9)
+;;   )
+
+(defn- min-moved-point-not-in-set
+ [perms points] 
+ " pick the minimum moved point by elements in perms not 
+   in the set of points
+ "
+ (letfn [(not-in-points [x] (filter #(not (contains? points %)) x))  ;; function to reject those in base
+         (moved-points-not-in-base [x] (not-in-base (keys x)))]
+  (first (reduce #(vector (apply min (concat %1 (moved-points-not-in-points %2)))) nil perms))))
 
 (defn Schreier-procedure
   [{:keys [base sgs base-stabilizers]}]
@@ -302,8 +301,7 @@
         into the BSGS
         e.g. {'a' {2 1, 1 2}, 'b' {4 3, 3 4}, 'c' {3 2, 2 3}}
   " 
-  (let [not-in-base (fn [x] (filter #(not (contains? (set base) %)) x))  ;; function to reject those in base
-        [b] (reduce #(vector (apply min (concat %1 (-> %2 keys not-in-base)))) nil (vals base-stabilizers))
+  (let [b (min-moved-point-not-in-set (vals base-stabilizers) (set base)) ;; extend to this point
         sv (Schreier-vector b base-stabilizers)  ;; compute Schreier-vector of gens wrt b
         lvl-gens (filter #(not (pg/pointwise-stabilizer? (second %) [b])) base-stabilizers)  ;new level gens
         Gstab (Schreier-generators base-stabilizers sv)  ;; compute Schreier-generators of new stabilizer
@@ -317,3 +315,46 @@
                  :gens (label-generators (vals lvl-gens) gen-label)})  ;; have to relabel the gens
      :base-stabilizers (label-generators (seq Gstab) new-gen-label)
      }))
+
+(defn- accum-sgs-build
+  [{:keys [gens size] :as sgs-build} g]
+  " function to accumulate the sgs "
+  (if (contains? gens g)
+    sgs-build  ;; if g is already in 
+    (-> sgs-build  ;; add g
+      (assoc :size (inc size))
+      (update-in [:gens] assoc g (str (char (+ size 97)))))))
+
+
+(defn Schreier-procedure
+  [{:keys [base sgs sgs-build generating-set] :as p-bsgs}]
+  " state-machien implementation of Schreier-procedure "
+  (if (empty? generating-set)
+    (let [; level (:lvl sgs-build)  ;; if generating-set empty
+          {:keys [lvl gens size]} sgs-build
+          b (base (dec lvl)) ;; or if not present have to pick one random ?
+          stab-gens (clojure.set/map-invert (:gens sgs-build))
+          sv (Schreier-vector b stab-gens) ;; construct sv
+          Gstab (Schreier-generators stab-gens sv)]
+      (println sv)
+      (if (empty? Gstab) ;; if no more stabilizers 
+        (dissoc p-bsgs :stack :sgs-size)  ;; terminate
+        (-> p-bsgs  ;; otherwise go to the next level 
+          (update-in [:sgs] conj {:lvl lvl :gens stab-gens})
+          ; (assoc :sgs (conj sgs 
+          ;  (assoc sgs-build :gens stab-gens)))   ;; update sgs
+          (assoc :sgs-build {:lvl (inc lvl) :gens {} :size size})  ;; 
+          (assoc :generating-set (seq Gstab))
+          ))) ;; refresh the stack
+    (let [[g & gs] generating-set  ;; if generating set not empty
+           b (first (filter #(not (contains? base %)) (keys g)))
+           new-base (if (pg/pointwise-stabilizer? g base) (conj base b) base)
+           ]  ;; get a b not contained
+       (-> p-bsgs 
+           (assoc :generating-set gs)  ;; pop generating-set
+           (assoc :base new-base)
+           (assoc :sgs-build (-> sgs-build (accum-sgs-build g) (accum-sgs-build (pg/inverse g))))))))
+
+; (defn Schreier-Sims-1 
+;  [{:keys [base sgs base-stabilizers]}]
+;  )
