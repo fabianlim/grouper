@@ -316,47 +316,45 @@
      :base-stabilizers (label-generators (seq Gstab) new-gen-label)
      }))
 
-(defn- accum-sgs-build
-  [{:keys [gens size] :as sgs-build} g]
-  " function to accumulate the sgs "
-  (if (contains? gens g)
-    sgs-build  ;; if g is already in 
-    (-> sgs-build  ;; add g
-      (assoc :size (inc size))
-      (update-in [:gens] assoc g (str (char (+ size 97)))))))
+
+(defn- empty-sgs 
+  ([start end]
+  " build an empty sgs of a from levels start to end "
+    (->> (range start (inc end))
+      (map #(hash-map :lvl % :gens #{}))
+      (reduce conj (vector))
+    ))
+  ([x]
+   (first (empty-sgs x (inc x)))))
 
 
+;;  I might not need to label the SGS 
+;; want to get rid of sgs-build
 (defn Schreier-procedure
-  [{:keys [base sgs sgs-build generating-set] :as p-bsgs}]
+  [{:keys [index base sgs generating-set] :as p-bsgs}]
   " state-machine implementation of Schreier-procedure "
-  (cond 
-    (nil? sgs-build)  ;; if no sgs-build do nothing
+  (cond (nil? p-bsgs)
       nil
     (empty? generating-set)
-      (let [{:keys [lvl gens size]} sgs-build
-            b (base (dec lvl)) ;; or if not present have to pick one random ?
-            stab-gens (clojure.set/map-invert (:gens sgs-build))
+      (let [b (base index) ;; this base
+            stab-gens (label-generators (seq (:gens (sgs index))))
             sv (Schreier-vector b stab-gens) ;; construct sv
-            Gstab (Schreier-generators stab-gens sv)]
-        (if (empty? Gstab) ;; if no more stabilizers 
-          (-> p-bsgs ;; terminate
-            (update-in [:sgs] conj {:lvl lvl :gens stab-gens})
-            (dissoc :sgs-build))
+            next-level-stabs (Schreier-generators stab-gens sv)]  ;; stahilizer w.r.t. b
+        (if (empty? next-level-stabs) ;; if no more stabilizers 
+          nil  ;; terminate
           (-> p-bsgs  ;; otherwise go to the next level 
-            (update-in [:sgs] conj {:lvl lvl :gens stab-gens})
-            (assoc :sgs-build {:lvl (inc lvl) :gens {} :size size})  ;; 
-            (assoc :generating-set (seq Gstab))
-            ))) ;; refresh the stack
+            (update-in [:index] inc)
+            (assoc :generating-set (seq next-level-stabs))))) ;; refresh the stack
     :else
-      (let [[g & gs] generating-set  ;; if generating set not empty
-             b (first (filter #(not (contains? base %)) (keys g)))
-             new-base (if (pg/pointwise-stabilizer? g base) (conj base b) base)
-             ]  ;; get a b not contained
+      (let [[g & gs] generating-set   ;; if generating set not empty
+             b (first (filter #(not (contains? base %)) (keys g)))  ;; get a b not contained
+             extend-base? (pg/pointwise-stabilizer? g base)
+             perform-extension (fn [x y] (if extend-base? (conj x y) x))]
          (-> p-bsgs 
              (assoc :generating-set gs)  ;; pop generating-set
-             (assoc :base new-base)
-             (assoc :sgs-build (-> sgs-build (accum-sgs-build g) (accum-sgs-build (pg/inverse g))))))))
+             (update-in [:base] perform-extension b)
+             (update-in [:sgs] perform-extension 
+                (empty-sgs (inc (count base))))
+             (update-in [:sgs index :gens] into [g (pg/inverse g)])
+             ))))
 
-; (defn Schreier-Sims-1 
-;  [{:keys [base sgs base-stabilizers]}]
-;  )
