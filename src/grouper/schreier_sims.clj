@@ -319,7 +319,7 @@
 
 (defn- empty-sgs 
   ([start end]
-  " build an empty sgs of a from levels start to end "
+  " build an empty sgs from levels start to end "
     (->> (range start (inc end))
       (map #(hash-map :lvl % :gens #{}))
       (reduce conj (vector))
@@ -327,25 +327,29 @@
   ([x]
    (first (empty-sgs x (inc x)))))
 
-
-;;  I might not need to label the SGS 
-;; want to get rid of sgs-build
-(defn Schreier-procedure
-  [{:keys [index base sgs generating-set] :as p-bsgs}]
-  " state-machine implementation of Schreier-procedure "
-  (cond (nil? p-bsgs)
+(defn build-Schreier-procedure
+  [procedure-after-completion procedure-consume-generator]
+ (fn [{:keys [index base sgs generating-set] :as p-bsgs}]
+  " state-machine builder of Schreier algorithms "
+   (cond (nil? p-bsgs)
       nil
     (empty? generating-set)
       (let [b (base index) ;; this base
-            stab-gens (label-generators (seq (:gens (sgs index))))
-            sv (Schreier-vector b stab-gens) ;; construct sv
-            next-level-stabs (Schreier-generators stab-gens sv)]  ;; stahilizer w.r.t. b
-        (if (empty? next-level-stabs) ;; if no more stabilizers 
-          nil  ;; terminate
+            gens (label-generators (seq (:gens (sgs index))))
+            sv (Schreier-vector b gens) ;; construct sv
+            b-stabs (Schreier-generators gens sv)]  ;; stahilizer w.r.t. b
+        (if (empty? b-stabs) ;; if no more stabilizers 
+          (procedure-after-completion p-bsgs) ;; terminate
           (-> p-bsgs  ;; otherwise go to the next level 
             (update-in [:index] inc)
-            (assoc :generating-set (seq next-level-stabs))))) ;; refresh the stack
+            (assoc :generating-set (seq b-stabs))))) ;; refresh the stack
     :else
+     (procedure-consume-generator p-bsgs))))
+
+(def Schreier-procedure
+  " top-to-bottom approach " 
+  (letfn [(completion [bsgs] nil)
+    (consume [{:keys [generating-set base index] :as p-bsgs}]
       (let [[g & gs] generating-set   ;; if generating set not empty
              b (first (filter #(not (contains? base %)) (keys g)))  ;; get a b not contained
              extend-base? (pg/pointwise-stabilizer? g base)
@@ -355,6 +359,5 @@
              (update-in [:base] perform-extension b)
              (update-in [:sgs] perform-extension 
                 (empty-sgs (inc (count base))))
-             (update-in [:sgs index :gens] into [g (pg/inverse g)])
-             ))))
-
+             (update-in [:sgs index :gens] into [g (pg/inverse g)]))))]
+    (build-Schreier-procedure completion consume)))
