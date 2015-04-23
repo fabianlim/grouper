@@ -146,16 +146,21 @@
           B []
           S (set gens)
           i 1
+          sz 1
           ord-gens (vector)]
     (if (nil? b) 
       ord-gens
       (let [B-ext (conj B b) ;; extend 
-            gens (clojure.set/select #(pg/pointwise-stabilizer? % B-ext) S)]
+            gens (clojure.set/select
+                   #((comp not pg/pointwise-stabilizer?) % B-ext) S)]
         (recur bs 
                B-ext
                (clojure.set/difference S gens)
                (inc i)
-               (conj ord-gens {:lvl i :gens gens}))))))
+               (+ sz (count gens))
+               (conj ord-gens 
+                 {:lvl i 
+                  :gens (label-generators (seq gens) sz)}))))))
 
 ;; partial-BSGS
 (defn partial-BSGS
@@ -165,7 +170,8 @@
     a partial-BSGS satisfies the following:
     * contains a generating set
     * closed under inversion
-    * all permutations must not fix (pointwise?) every element in the base
+    * all permutations must not fix (pointwise?) every element in 
+      the base
 
     Inputs
     ======
@@ -183,15 +189,12 @@
         (let [base-as-set (set B)]
           (recur ss 
                  (cons (pg/inverse s) S)
-                 (if (pg/pointwise-stabilizer? s B)  ;; check if need to extend base
+                 ;; check if need to extend base
+                 (if (pg/pointwise-stabilizer? s B)  
                    (conj B
                      (first (filter #(not (contains? base-as-set %)) (keys s))))
                    B)))))))
 
-
-; (clojure.pprint/pprint T)
-; (let [{:keys [base sgs]} T]
-;   (order-gens-wrt-base base sgs))
 
 ; TODO: will ignore remainder of set if there are more than 
 ; 26 generators in that set
@@ -202,7 +205,7 @@
     Inputs
     ======
     generator-set: vector of generators 
-    label-start: string of starting label, e.g. 'a', 'b', etc
+    label-start: numerical offset of starting label (starts from 1)
   "
   ([generator-set label-start]
     (loop [n label-start
@@ -243,7 +246,8 @@
 
 (defn Schreier-generators
   [generators sv]
-  " compute all the Schreier generators using the orbit from a Scherier vector 
+  " compute all the Schreier generators 
+    using the orbit from a Scherier vector 
 
     Inputs
     ======
@@ -252,70 +256,8 @@
     sv: Schreier-vector w.r.t. generators and some base
   "
   (reduce  ;; (keys sv) is really the orbit
-    #(into %1 (Schreier-point->generators generators sv %2)) #{} (keys sv)))
-
-
-;; (def T (partial-BSGS [] [] (vector (pg/cyc-notation [1 2])
-;;                             (pg/cyc-notation [2 3])
-;;                             (pg/cyc-notation [3 4])
-;;                             )))
-
-; (clojure.pprint/pprint (take 4 (iterate Schreier-procedure 
-;   {:base [] :sgs []
-;    :base-stabilizers (label-generators (vector (pg/cyc 1 2) (pg/cyc 2 3) (pg/cyc 3 4)))})))
-
-
-;; (let [gens {"a" (pg/cyc-notation [1 10] [2 8] [3 11] [5 7]) 
-;;            "b" (pg/cyc-notation [1 4 7 6] [2 11 10 9])}
-;;       sv (Schreier-vector 1 gens)
-;;       ]
-;;   (clojure.pprint/pprint (nth (iterate Schreier-procedure 
-;;     {:base [] :sgs []
-;;      :base-stabilizers gens}) 3))
-;;   ; (clojure.pprint/pprint (keys sv))
-;;   ; (clojure.pprint/pprint sv)
-;;   ; (clojure.pprint/pprint (Schreier-point->generators gens sv 2))
-;;   ; (clojure.pprint/pprint (Schreier-generators gens sv))
-;;   ; (Schreier-vector-coset-leader gens sv 9)
-;;   ; (Schrerier-vector-point->root sv 9)
-;;   )
-
-(defn- min-moved-point-not-in-set
- [perms points] 
- " pick the minimum moved point by elements in perms not 
-   in the set of points
- "
- (letfn [(not-in-points [x] (filter #(not (contains? points %)) x))  ;; function to reject those in base
-         (moved-points-not-in-base [x] (not-in-base (keys x)))]
-  (first (reduce #(vector (apply min (concat %1 (moved-points-not-in-points %2)))) nil perms))))
-
-(defn Schreier-procedure
-  [{:keys [base sgs base-stabilizers]}]
-  " 
-    Inputs
-    ======
-    a hash-map containing the following keys:
-    - base: set of base points, e.g. []
-    - sgs:  strong generating set
-    - base-stabilizers: hash-map of generators that are pointwise-stabilizers of base, to be included
-        into the BSGS
-        e.g. {'a' {2 1, 1 2}, 'b' {4 3, 3 4}, 'c' {3 2, 2 3}}
-  " 
-  (let [b (min-moved-point-not-in-set (vals base-stabilizers) (set base)) ;; extend to this point
-        sv (Schreier-vector b base-stabilizers)  ;; compute Schreier-vector of gens wrt b
-        lvl-gens (filter #(not (pg/pointwise-stabilizer? (second %) [b])) base-stabilizers)  ;new level gens
-        Gstab (Schreier-generators base-stabilizers sv)  ;; compute Schreier-generators of new stabilizer
-        gen-label (apply min (map #(- (int (.charAt % 0)) 96) (keys base-stabilizers)))
-        new-gen-label (+ gen-label (count lvl-gens))
-        ]
-    {:base 
-      (if (nil? b) base (conj base b))
-     :sgs 
-      (conj sgs {:lvl (inc (count base)) 
-                 :gens (label-generators (vals lvl-gens) gen-label)})  ;; have to relabel the gens
-     :base-stabilizers (label-generators (seq Gstab) new-gen-label)
-     }))
-
+    #(into %1 (Schreier-point->generators 
+                generators sv %2)) #{} (keys sv)))
 
 (defn- empty-sgs 
   ([start end]
@@ -327,37 +269,164 @@
   ([x]
    (first (empty-sgs x (inc x)))))
 
+
+(defn- initialize-process-stack 
+  [gen-set]
+  (list (hash-map :lvl 1 :stack (seq gen-set))  ))
+
+(defn Schreier-Sims-initial-state
+  [{:keys [base generating-set]}]
+  (let 
+    [sgs (order-gens-wrt-base base (seq generating-set))]
+    {:sgs sgs
+     :base base
+     :level (count base)  ; start from bottom
+     :sv-chain (Schreier-vector-chain {:base base :sgs sgs})
+     :process-stack generating-set
+     }))
+
+;; Schreier-Sims
+(def Schreier-Sims
+   (letfn 
+     [(subbase-stabilizers
+       [perm-seq base index]
+       " filter out elements in perm-seq that stabilize 
+         subbase(0,index-1) 
+       " 
+       (filter #(pg/pointwise-stabilizer? % 
+          (subvec base 0 index) perm-seq)))
+     (check-completion 
+       [p-stack]
+       " check the head of p-stack 
+         p-stack: ({:lvl: x, :stack (...)}, ...)
+       " 
+       (-> p-stack peek :stack empty?))
+     (find-new 
+       [p-bsgs]
+       nil)
+     (update-stack  ;; go up
+       [{:keys [index sgs base] :as p-bsgs}] 
+       ;; if completed and there are some b-stabs
+       ;; need to go up
+       (when (> 0 index)
+         (-> p-bsgs 
+           (update-in [:index] dec)
+           (update-in [:generating-set] cons
+             (subbase-stabilizers sgs base index)))))
+     (consume-generator
+       [p-bsgs]
+       " get the residue and update " 
+       (let [[g & gs] 
+         (BSGS-check-group-membership ))]
+     (build-Schreier-procedure 
+       check-completion 
+       find-new
+       update-stack
+       consume-generator)))
+
+;; build-Schreier-procedure
 (defn build-Schreier-procedure
-  [procedure-after-completion procedure-consume-generator]
- (fn [{:keys [index base sgs generating-set] :as p-bsgs}]
+  [procedure-check-completion
+   procedure-find-new-generators
+   procedure-update-stack
+   procedure-consume-generator]
+ (fn [{:keys [process-stack] :as p-bsgs}]
   " state-machine builder of Schreier algorithms "
    (cond (nil? p-bsgs)
       nil
-    (empty? generating-set)
-      (let [b (base index) ;; this base
-            gens (label-generators (seq (:gens (sgs index))))
-            sv (Schreier-vector b gens) ;; construct sv
-            b-stabs (Schreier-generators gens sv)]  ;; stahilizer w.r.t. b
+    (procedure-check-completion process-stack)
+      (let [b-stabs (procedure-find-new-generators p-bsgs)]  
         (if (empty? b-stabs) ;; if no more stabilizers 
-          (procedure-after-completion p-bsgs) ;; terminate
-          (-> p-bsgs  ;; otherwise go to the next level 
-            (update-in [:index] inc)
-            (assoc :generating-set (seq b-stabs))))) ;; refresh the stack
+          nil ; TODO: perhaps I will just terminate here 
+          (procedure-update-stack p-bsgs b-stabs)))
     :else
      (procedure-consume-generator p-bsgs))))
 
+; Schreier-procedure
 (def Schreier-procedure
   " top-to-bottom approach " 
-  (letfn [(completion [bsgs] nil)
-    (consume [{:keys [generating-set base index] :as p-bsgs}]
-      (let [[g & gs] generating-set   ;; if generating set not empty
-             b (first (filter #(not (contains? base %)) (keys g)))  ;; get a b not contained
+  (letfn [ 
+    (find-new
+      [{:keys [index base sgs]}]
+      (let [b (base index) ;; this base
+           subbase (subvec base 0 (inc index))
+           gens (->> sgs
+             (filter #(pg/pointwise-stabilizer? % subbase))
+             (label-generators))
+           sv (Schreier-vector b gens)] ;; construct sv
+         ;; stabilizer w.r.t. b
+         (seq (Schreier-generators gens sv))))
+    (update 
+      [x new-gens] 
+      (-> x
+        ;; go down one level
+        (update-in [:index] inc)
+        ;; stack will be empty, so put in new-gens
+        (assoc :process-stack new-gens)))   
+    (consume 
+      [{:keys [process-stack base] :as p-bsgs}]
+      (let [[g & gs] process-stack   ;; if generating set not empty
+             ;; get a b not contained
+             b (first (filter #(not (contains? base %)) (keys g)))  
              extend-base? (pg/pointwise-stabilizer? g base)
              perform-extension (fn [x y] (if extend-base? (conj x y) x))]
          (-> p-bsgs 
-             (assoc :generating-set gs)  ;; pop generating-set
+             (assoc :process-stack gs)  ;; pop process-stack
              (update-in [:base] perform-extension b)
-             (update-in [:sgs] perform-extension 
-                (empty-sgs (inc (count base))))
-             (update-in [:sgs index :gens] into [g (pg/inverse g)]))))]
-    (build-Schreier-procedure completion consume)))
+             (update-in [:sgs] into [g (pg/inverse g)]))))]
+    (build-Schreier-procedure empty? find-new update consume)))
+
+; Schreier-procedure-initial-state
+(defn Schreier-procedure-initial-state
+  [p-bsgs]
+  (-> p-bsgs
+    (clojure.set/rename-keys {:generating-set :process-stack})
+    (assoc :sgs #{} :index 0)))
+
+
+(defn- min-moved-point-not-in-set
+ [perms points] 
+ " pick the minimum moved point by elements in perms not 
+   in the set of points
+ "
+ ;; function to reject those in base
+ (letfn [(not-in-points [x] (filter #(not (contains? points %)) x))
+         (moved-points-not-in-base [x] (not-in-base (keys x)))]
+  (first (reduce #(vector (apply min 
+    (concat %1 (moved-points-not-in-points %2)))) nil perms))))
+
+(defn Schreier-procedure
+  [{:keys [base sgs base-stabilizers]}]
+  " 
+    Inputs
+    ======
+    a hash-map containing the following keys:
+    - base: set of base points, e.g. []
+    - sgs:  strong generating set
+    - base-stabilizers: hash-map of generators that are 
+      pointwise-stabilizers of base, to be included
+        into the BSGS
+        e.g. {'a' {2 1, 1 2}, 'b' {4 3, 3 4}, 'c' {3 2, 2 3}}
+  " 
+  (let [b (min-moved-point-not-in-set 
+            (vals base-stabilizers) (set base)) ;; extend to this point
+        ;; compute Schreier-vector of gens wrt b
+        sv (Schreier-vector b base-stabilizers)  
+        lvl-gens ;new level gens
+          (filter #(not 
+           (pg/pointwise-stabilizer? 
+             (second %) [b])) base-stabilizers)  
+        ;; compute Schreier-generators of new stabilizer
+        Gstab (Schreier-generators 
+                base-stabilizers sv)  
+        gen-label 
+          (apply min (map #(- (int (.charAt % 0)) 96) 
+                          (keys base-stabilizers)))
+        new-gen-label (+ gen-label (count lvl-gens))]
+    {:base 
+      (if (nil? b) base (conj base b))
+     :sgs ;; have to relabel the gens
+      (conj sgs {:lvl (inc (count base)) 
+                 :gens (label-generators 
+                         (vals lvl-gens) gen-label)})  
+     :base-stabilizers (label-generators (seq Gstab) new-gen-label)}))
