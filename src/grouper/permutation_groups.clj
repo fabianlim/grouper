@@ -115,3 +115,8 @@
   " is permutation p a pointwise stabilizer of points S " 
     (= (map #(p % %) S) S))  
 
+;; moved-points-other-than
+(defn moved-points-other-than 
+  [p v]
+  " find moved points of p not in v "
+  (filter #(not (contains? (set v) %)) (keys p)))
