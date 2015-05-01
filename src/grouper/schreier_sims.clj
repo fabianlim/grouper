@@ -17,7 +17,7 @@
   " extend Schreier tree from init-tree
   " 
   (loop [tree init-tree
-         queue (conj clojure.lang.PersistentQueue/EMPTY 
+         queue (apply conj clojure.lang.PersistentQueue/EMPTY 
                      (keys init-tree))]
       (if (empty? queue)
         tree
@@ -46,12 +46,18 @@
     {root {:from nil :gen nil}} generating-set))
 
 ;; SGS-generators
-(defn SGS-generators [sgs]
-  (reduce #(into %1 (:gens %2)) {} sgs))
+(defn SGS-generators 
+  ([sgs]
+    (reduce #(into %1 (:gens %2)) {} sgs))
+  ([sgs level]
+    (SGS-generators (subvec sgs (dec level)))))
 
 ;; BSGS-generators
-(defn BSGS-generators [bsgs]
-  (SGS-generators (:sgs bsgs)))
+(defn BSGS-generators 
+  ([bsgs]
+    (SGS-generators (:sgs bsgs)))
+  ([bsgs level]
+    (SGS-generators (:sgs bsgs) level)))
 
 ;; Schreier-vector-chain
 (defn Schreier-vector-chain 
@@ -206,6 +212,7 @@
    (label-generators generating-set 1)))
 
 ; order-gens-wrt-base
+;; TODO: if not using please get rid of this
 (defn order-gens-wrt-base 
   [base gens]
   " label generators to which level they belong to " 
@@ -253,17 +260,14 @@
             B base-points]
       (if (nil? s)
         {:base B :generating-set S}
-        (let [base-as-set (set B)]
-          (recur ss 
-                 (cons (pg/inverse s) S)
-                 ;; check if need to extend base
-                 (if (pg/pointwise-stabilizer? s B)  
-                   (conj B
-                     (first (filter 
-                              #(not (contains? base-as-set %)) (keys s))))
-                   B)))))))
+        (recur ss 
+               (into S #{(pg/inverse s)})
+              ;; check if need to extend base
+               (if (pg/pointwise-stabilizer? s B)  
+                 (conj B (apply min (pg/moved-points-other-than s B)))
+                 B))))))
 
-; Scherier0
+; Scherier-point->generators
 (defn Schreier-point->generators
   [generators sv point]
   " compute the Schreier generators under action of generators on point 
@@ -301,31 +305,10 @@
     #(into %1 (Schreier-point->generators 
                 generators sv %2)) #{} (keys sv)))
 
-(defn- empty-sgs 
-  ([start end]
-  " build an empty sgs from levels start to end "
-    (->> (range start (inc end))
-      (map #(hash-map :lvl % :gens (hash-map)))
-      (reduce conj (vector))
-    ))
-  ([x]
-   (first (empty-sgs x (inc x)))))
-
-; (defn- initialize-process-stack 
-;   [gen-set]
-;   (list (hash-map :lvl 1 :stack (seq gen-set))  ))
-
 (defn- extends-Schreier-vector?
   [sv node from]
   (and (not (contains? sv node))  ;; node not yet there
           (contains? sv from))) ;; from is there
-
-; (defn- update-Schreier-vector
-;   [sv node from gen]
-;   " doesn't check the gen labeling though " 
-;   (if (extends-Schreier-vector? sv node from)
-;     (assoc sv node {:from from :gen gen})
-;     sv))
 
 (defn- Schreier-vector-chain-stump
   [b]
@@ -349,6 +332,54 @@
     :else
      (procedure-consume-generator p-bsgs))))
 
+;; partial-bsgs-insert-generator
+(defn- partial-bsgs-insert-generator
+  [p-bsgs drop-out generators]
+  " insert generator at the drop-out " 
+  (let [new-gens (label-generators generators (:size p-bsgs))
+        old-gens (BSGS-generators p-bsgs drop-out)
+        index (dec drop-out)
+        ; old-sv (get-in p-bsgs [:sgs index :sv])  ;; could use this
+        update-process-stack 
+          #(update-in % [:process-stack drop-out]  ;; update process-stack
+            into (Schreier-generators (into old-gens new-gens)
+              (get-in % [:sgs index :sv])))
+        ]
+      (-> p-bsgs
+        (update-in [:sgs index :sv]  ;; update-sv
+           extend-Schreier-vector (into old-gens new-gens))
+        (update-in [:sgs index :gens]  ;; update-gens
+            into new-gens)
+        (assoc :level drop-out)  ;; update level
+        (update-in [:size] + (count new-gens))  ;; update size
+        (update-process-stack)  ;; update process-stack
+        )))
+
+;; Schreier-Sims-initial-state
+(defn Schreier-Sims-initial-state
+  [{:keys [base generating-set]}]
+  (let 
+    [level (count base)
+     gens (order-gens-wrt-base base generating-set)
+     sv-chain (Schreier-vector-chain {:base base :sgs gens})
+     gen-chain (fn [l]   ;; this is essentially S_i
+                 (->> gens 
+                  (filter #(>= (:lvl %) l))
+                  (map :gens)
+                  (into {})))
+     Gstabs (map #(Schreier-generators (gen-chain %1) 
+             (sv-chain %2)) (range 1 (inc level)) base)]
+    {
+     :sgs (into [] (map #(assoc %1 :sv (sv-chain %2)) gens base))
+     :base base
+     :size (count generating-set)
+     :level level ; start from bottom
+     :process-stack 
+       (->> Gstabs (map-indexed #(vector (inc %1) 
+         (into clojure.lang.PersistentQueue/EMPTY %2)))
+         (into {}))
+     }))
+
 ;; update-if
 (defn- update-if
   [m pred x & xs]
@@ -357,67 +388,6 @@
     m 
     (apply x m xs)))
 
-;; partial-bsgs-insert-generator
-(defn- partial-bsgs-insert-generator
-  [p-bsgs drop-out generator]
-  " insert generator at the drop-out " 
-  (let [b (get-in p-bsgs [:base (dec drop-out)]) ;; base-point
-      k (int->key (inc (:size p-bsgs)))  ;; key
-      image (generator b)  ;; image
-      ; sv (get-in p-bsgs [:sv-chain b]) ;; Scherier- vector
-      sv (get-in p-bsgs [:sgs (dec drop-out) :sv]) ;; Scherier- vector
-      new-gen? (extends-Schreier-vector? sv image b)]
-    (do 
-      (println "sv" sv)
-      (println "do" drop-out)
-      (println "gen" generator)
-      (println "new-gen" new-gen?)
-      (println "image" image)
-      (println "b " b)
-      (-> p-bsgs 
-        ; (update-if new-gen? assoc-in [:sv-chain b image] 
-        ;    {:from b :gen k})
-        (update-if new-gen? assoc-in [:sgs (dec drop-out) :sv image] 
-           {:from b :gen k})
-        (update-if new-gen? update-in [:size] inc)
-        (update-if new-gen? assoc-in 
-           [:sgs (dec drop-out) :gens k] generator)))))
-
-;; TODO : which gens are new?
-(defn Schreier-Sims-new-gens
-  [{:keys [sgs base] :as p-bsgs} up-level]
-  (let [gens (->> (filter #(>= (:lvl %) up-level) sgs)
-                 (reduce #(into %1 (:gens %2)) {}))
-        base-up (base (dec up-level))
-        sv (Schreier-vector base-up gens)
-        Gstabs (Schreier-generators gens sv) ;; last level stabs to init
-        ]
-    sv))
-
-;; Schreier-Sims-initial-state
-(defn Schreier-Sims-initial-state
-  [{:keys [base generating-set]}]
-  (let 
-    [level (count base)
-     gens (label-generators generating-set)
-     base-up (base (dec (dec level)))
-     sv (Schreier-vector base-up gens)
-     Gstabs (Schreier-generators gens sv) ;; last level stabs to init
-     ]
-    {; :sgs (reduce #(into) (empty-sgs 1 level))
-     :sgs (into [] (map #(assoc %1 :sv 
-             (Schreier-vector-chain-stump %2)) 
-             (empty-sgs 1 level) base))
-     :base base
-     :size 0
-     :level level  ; start from bottom
-     ; :sv-chain (into {} 
-     ;     (map #(vector % 
-     ;     (Schreier-vector-chain-stump %)) base))  ;; init empty
-     ; :process-stack (map #(list level %) generating-set)
-     :process-stack (map #(list level %) Gstabs)
-     }))
-
 ;; Scherier-Sims-update-after-consumption
 (defn- Scherier-Sims-update-after-consumption 
   [{:keys [base size] :as p-bsgs} drop-out residue]
@@ -425,175 +395,49 @@
   (if (empty? residue)
     p-bsgs  ;; empty residue, do nothing
     (let [extend-base? (> drop-out (count base))
-          b (if-not extend-base?
+          b (if-not extend-base?  ;; if we are extending the base
               (base (dec drop-out))
-              ;(first (pg/moved-points-other-than residue base))
-              (min-moved-point-not-in-set [residue] base))
-              ]
-      (do
-        (println "extend-base" extend-base?)
-        (-> p-bsgs 
-            ; (update-if extend-base? update-in  ;; TODO : fix
-            ;   [:sv-chain] conj {b (Schreier-vector-chain-stump b)})
-            (update-if extend-base? update-in 
-              [:sgs] conj {:sv (Schreier-vector-chain-stump b)
-                           :lvl drop-out :gens {}})
-            (update-if extend-base? update-in [:base] conj b)
-            ; (update-if extend-base? update-in [:sgs] conj
-            ;   {:lvl drop-out :gens {}})
-            (partial-bsgs-insert-generator drop-out residue)
-            (partial-bsgs-insert-generator drop-out (pg/inverse residue))
-            )))))
+              (apply min (pg/moved-points-other-than residue base)))
+          inv-residue (pg/inverse residue)]
+      (-> p-bsgs 
+          (update-if extend-base? update-in 
+            [:sgs] conj {:sv (Schreier-vector-chain-stump b)
+                         :lvl drop-out :gens {}})
+          (update-if extend-base? update-in [:base] conj b)
+          (update-if extend-base? assoc-in [:process-stack b] 
+               clojure.lang.PersistentQueue/EMPTY)
+          (partial-bsgs-insert-generator drop-out 
+            (vector inv-residue residue))))))    
 
 ;; Schreier-Sims
 (def Schreier-Sims
    (letfn 
-     [(subbase-stabilizers
-       [perm-seq base index]
-       " filter out elements in perm-seq that stabilize 
-         subbase(0,index-1) 
-       " 
-       (filter #(pg/pointwise-stabilizer? % 
-          (subvec base 0 index) perm-seq)))
-     (completion 
+     [(completion 
        [{:keys [process-stack level]}]
-       (or (empty? process-stack) )
-           (not= (first (first process-stack)) level))
+       (empty? (process-stack level)))
      (find-new 
-       [{:keys [sv-chain base level] :as p-bsgs}]
+       [{:keys [process-stack level]}]
        " the new addition in S plus the new coset rep " 
-       (when-not (= level 1)
-         (let
-           [up-level (dec level)  ;; dec level
-            b (base (dec up-level)) ;; base one level below
-            sv (sv-chain b)  ;; Schreier-vector one leve up
-            ;; TODO: should only need to consider gens from 
-            ;; prev level. Should be the only new gens
-            gens (get-in p-bsgs [:sgs (dec level) :gens])]
-           (do 
-             (println)
-             (println)
-             (println "gens" gens)
-             (println "sv" sv)
-             (Schreier-generators gens sv)))))
+        (loop [l level]
+          (if-not (empty? (process-stack l))
+            (process-stack l)
+            (when (> l 1) (recur (dec l))))))
      (update-stack  ;; go up
-       [{:keys [index sgs base] :as p-bsgs}] 
-       ;; if completed and there are some b-stabs
-       ;; need to go up
-       (when (> 0 index)
-         (-> p-bsgs 
-           (update-in [:index] dec)
-           (update-in [:generating-set] cons
-             (subbase-stabilizers sgs base index)))))
+       [p-bsgs _] 
+       (update-in p-bsgs [:level] dec))
      (consume-generator
-       [{:keys [process-stack sgs base] :as p-bsgs}]
+       [{:keys [process-stack sgs base level] :as p-bsgs}]
        " get the residue and update " 
-       (let [[[l g] & gs] process-stack
-              subv #(subvec % (dec l) (count base))
+       (let [ g (peek (process-stack level))
+              subv #(subvec % (dec level) (count base))
               [g-res drop-out] (BSGS-permutation-residue
                   {:sgs (subv sgs) :base (subv base)} g)]
-         (do
-         (println {:sgs (subv sgs) :base (subv base)})
          (-> p-bsgs
-            ; update sv-chain, sgs, base
            (Scherier-Sims-update-after-consumption drop-out g-res)
-           ;; TODO update level if going down
-           (assoc :process-stack gs)))))]
+           (update-in [:process-stack level] pop))))]
 
      (build-Scherier-procedure 
        completion
        find-new
        update-stack
        consume-generator)))
-
-; (BSGS-permutation-residue
-;   {:sgs [{:lvl 1 :gens {}}] :base [1 2]}
-;   (pg/cyc-notation [3 4]))
-
-; Schreier-procedure
-(def Schreier-procedure
-  " top-to-bottom approach " 
-  (letfn [ 
-    (find-new
-      [{:keys [index base sgs]}]
-      (let [b (base index) ;; this base
-           subbase (subvec base 0 (inc index))
-           gens (->> sgs
-             (filter #(pg/pointwise-stabilizer? % subbase))
-             (label-generators))
-           sv (Schreier-vector b gens)] ;; construct sv
-         ;; stabilizer w.r.t. b
-         (seq (Schreier-generators gens sv))))
-    (update 
-      [x new-gens] 
-      (-> x
-        ;; go down one level
-        (update-in [:index] inc)
-        ;; stack will be empty, so put in new-gens
-        (assoc :process-stack new-gens)))   
-    (consume 
-      [{:keys [process-stack base] :as p-bsgs}]
-      (let [[g & gs] process-stack   ;; if generating set not empty
-             ;; get a b not contained
-             b (first (pg/moved-points-other-than g base))
-             extend-base? (pg/pointwise-stabilizer? g base)
-             perform-extension (fn [x y] (if extend-base? (conj x y) x))]
-         (-> p-bsgs 
-             (assoc :process-stack gs)  ;; pop process-stack
-             (update-in [:base] perform-extension b)
-             (update-in [:sgs] into [g (pg/inverse g)]))))]
-    (build-Schreier-procedure 
-      #(empty? (:process-stack %))
-      find-new update consume)))
-
-; Schreier-procedure-initial-state
-(defn Schreier-procedure-initial-state
-  [p-bsgs]
-  (-> p-bsgs
-    (clojure.set/rename-keys {:generating-set :process-stack})
-    (assoc :sgs #{} :index 0)))
-
-(defn- min-moved-point-not-in-set
- [perms points] 
- " pick the minimum moved point by elements in perms not 
-   in the set of points
- "
- ;; function to reject those in base
- (first (reduce #(vector (apply min 
-   (concat %1 (pg/moved-points-other-than %2 points)))) nil perms)))
-
-(defn Schreier-procedure
-  [{:keys [base sgs base-stabilizers]}]
-  " 
-    Inputs
-    ======
-    a hash-map containing the following keys:
-    - base: set of base points, e.g. []
-    - sgs:  strong generating set
-    - base-stabilizers: hash-map of generators that are 
-      pointwise-stabilizers of base, to be included
-        into the BSGS
-        e.g. {'a' {2 1, 1 2}, 'b' {4 3, 3 4}, 'c' {3 2, 2 3}}
-  " 
-  (let [b (min-moved-point-not-in-set 
-            (vals base-stabilizers) base) ;; extend to this point
-        ;; compute Schreier-vector of gens wrt b
-        sv (Schreier-vector b base-stabilizers)  
-        lvl-gens ;new level gens
-          (filter #(not 
-           (pg/pointwise-stabilizer? 
-             (second %) [b])) base-stabilizers)  
-        ;; compute Schreier-generators of new stabilizer
-        Gstab (Schreier-generators 
-                base-stabilizers sv)  
-        gen-label 
-          (apply min (map #(- (int (.charAt % 0)) 96) 
-                          (keys base-stabilizers)))
-        new-gen-label (+ gen-label (count lvl-gens))]
-    {:base 
-      (if (nil? b) base (conj base b))
-     :sgs ;; have to relabel the gens
-      (conj sgs {:lvl (inc (count base)) 
-                 :gens (label-generators 
-                         (vals lvl-gens) gen-label)})  
-     :base-stabilizers (label-generators (seq Gstab) new-gen-label)}))
