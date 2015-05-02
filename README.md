@@ -9,6 +9,9 @@ Contains the following implemented algorithms in these namespaces
 #### grouper.free-groups
 - Todd-Coxeter Algorithm
 
+#### grouper.schreier-sims
+- Schreier-Sims Algorithm
+
 ## License
 
 Copyright © 2015 FIXME
