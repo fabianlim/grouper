@@ -340,12 +340,15 @@
         old-gens (BSGS-generators p-bsgs drop-out)
         index (dec drop-out)
         ; old-sv (get-in p-bsgs [:sgs index :sv])  ;; could use this
+        ;; TODO: I believe you have to update the stack in above levels
+        ;; results may be incorrect nuow
         update-process-stack 
           #(update-in % [:process-stack drop-out]  ;; update process-stack
             into (Schreier-generators (into old-gens new-gens)
               (get-in % [:sgs index :sv])))
         ]
       (-> p-bsgs
+        ;; TODO;; not optmizing out old gens and old orbits yet
         (update-in [:sgs index :sv]  ;; update-sv
            extend-Schreier-vector (into old-gens new-gens))
         (update-in [:sgs index :gens]  ;; update-gens
