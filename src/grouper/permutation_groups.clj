@@ -1,5 +1,6 @@
 (ns grouper.permutation-groups
-  (:require [grouper.core-group-functions :as co]))
+  (:require [grouper.core-group-functions :as co]
+            [grouper.free-groups :as fg]))
 
 
 ; compose method for permutation morphisms
@@ -8,12 +9,18 @@
   ;; result is a union of two maps
   ;; - first map is (this) with values replaced by values of (other)
   ;; - second map is (other)'s keys and values that are out of (this)'s range 
-  (let [this-k-with-v-mapped-by-other (map (fn [[k v]] [k (other v v)])  (seq this)) 
+  (let [this-k-with-v-mapped-by-other 
+          (map (fn [[k v]] [k (other v v)])  (seq this)) 
         this-v (vals this)
-        other-k-out-of-range-of-this (filter (fn [[k v]] (not-any? #(= k %) this-v))  (seq other))
+        other-k-out-of-range-of-this 
+          (filter (fn [[k v]] (not-any? #(= k %) this-v))  (seq other))
         filter-moved-points #(filter (fn [[k v]] (not= k v)) %)]
     (reduce into {} [(filter-moved-points this-k-with-v-mapped-by-other)
                      (filter-moved-points other-k-out-of-range-of-this)])))
+
+; order function for permutations
+; TODO: how to organize such functions?
+(def order (co/build-order-function compose))
 
 ; cyc method for permutation morphisms
 (defn cyc [& args]
@@ -26,23 +33,6 @@
       (if (nil? xs) 
         {} ; if xs is nil, will return empty map
         (assoc (zipmap args xs) (last xs) x)))))
-
-; recursive version of cyc
-; (defn cyc [& args]
-;   " cycle notation convinience function "
-;   (if (or (< (count args) 2) (not (apply distinct? args)))
-;     (hash-map) 
-;     (loop [perm {}
-;            [x & xs] args
-;            px nil]
-;         (if (nil? x) 
-;           (-> perm (assoc x (perm nil)) (dissoc nil))
-;           (recur (assoc perm px x) xs x)))))
-
-;; cyc-notation
-;; if a cycle is improperly specified, will simply ignore it
-;; (defn cyc-notation [& args]
-;;   (reduce compose (map (partial apply cyc) args)))
 
 ;; inverse 
 (def inverse clojure.set/map-invert)
@@ -57,17 +47,6 @@
              acc
              (into acc (apply cyc x)))
            xs))))
-
-; first-cyc method for permutation morphisms
-;; ; TODO ; can generalize this to input a function to select the key
-;; (defn first-cyc [p]
-;;   " extract out the 'first' cycle. What 'first' means is the first key returned after application of first "
-;;   (letfn [(helper [pt p-rem acc]
-;;                  (if 
-;;                    (contains? p-rem pt) 
-;;                    (recur (p pt) (dissoc p-rem pt) (cons pt acc)) ; if pt is in the desconstructed perm, recur
-;;                    (apply cyc acc)))] ; otherwise, return result (cyc)
-;;       (helper (first (keys p)) p ()))) ; the first key = starting pt
 
 ;; build-cyc-transform
 (defn- build-cyc-transform [aggregate-func]
