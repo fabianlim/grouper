@@ -16,28 +16,18 @@
   (fn [this other] 
     (map #(%1 %2 %3) actions this other)))
 
-; TODO this macro is possibly a bad idea
-;; unpack-args macro 
-;; (defmacro unpack-args [f arglist]
-;;   " unpack args to function f"
-;;   `(~f ~@arglist))
-
-
-;; (defn cartesian-product [G H]
-;;   co/Monoid
-;;   (co/action [this]
-;;   )
-;;   (let [g 
-;;         
-;;         ])
-;;   [x y]
-;;   )
-
-;; TODO : extend something like this for direct product action?
-;; recall elements are Morphisms on a particular Domain, so this
-;; takes it into a product of morphisms on a product of Domains
-;; (map co/identity-element [(->ZmodN 5) (->ZmodN 3)])
-;; 
-;; (let [a (map co/element [(->ZmodN 5) (->ZmodN 3)] [2 4])
-;;       b (map co/element [(->ZmodN 5) (->ZmodN 3)] [1 2])]
-;;   (map co/compose a b))
+;; bfs
+;; TODO: this prolly doesnt belong here
+(defn bfs-builder
+  [generate-new-items update-result populate-queue]
+  " bfs reusable form " 
+  (fn [init-result init-queue]
+    (loop [result init-result
+           queue (apply conj clojure.lang.PersistentQueue/EMPTY 
+                       init-queue)]
+      (if (empty? queue)
+        result 
+        (let [x (peek queue)
+              new-items (generate-new-items x result)]
+          (recur (update-result x result new-items)
+               (reduce conj (pop queue) (populate-queue new-items))))))))

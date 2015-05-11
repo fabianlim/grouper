@@ -2,29 +2,28 @@
 ;; TODO: implement for permutation groups first
 (ns grouper.schreier-sims
   (:require [grouper.permutation-groups :as pg]
-            [grouper.free-groups :as fg]))
+            [grouper.free-groups :as fg]
+            [grouper.core-group-functions :as co]))
+
 
 ;; extend-Schreier-vector
-;; actually a BFS 
-;; TODO: assumes points are indices
 (defn extend-Schreier-vector
   [init-tree generating-set]
-  " extend Schreier tree from init-tree
-  " 
-  (loop [tree init-tree
-         queue (apply conj clojure.lang.PersistentQueue/EMPTY 
-                     (keys init-tree))]
-      (if (empty? queue)
-        tree
-        (let [x (peek queue)  ;; current item
-          new-points (->> generating-set
-            (map (fn [[n gen]] (vector (gen x) n)))
-            (filter #(first %)) ;; filter out points that are nil 
-            ;; filter points not in tree
-            (filter #(not (contains? tree (first %)))))]  
-          (recur (reduce #(assoc %1 (first %2) 
-             {:from x :gen (second %2)}) tree new-points) 
-             (reduce conj (pop queue) (map first new-points)))))))
+  " extend Schreier tree from init-tree " 
+  (letfn [
+    (generate-new-items [x result]
+      (->> generating-set   ;; generate-new-items
+        (map (fn [[n gen]] (vector (gen x) n)))  ; image-label pairs
+        (filter #(first %)) ;; filter out nil images
+        (filter #(not (contains? result (first %))))))
+    (update-result [x result new-items]
+        (reduce #(assoc %1 (first %2) 
+           {:from x :gen (second %2)}) result new-items))
+    (populate-queue [new-items] (map first new-items))]
+  ;; eval function
+  ((co/bfs-builder generate-new-items update-result populate-queue)
+    init-tree (keys init-tree))))
+
 
 ;; Schreier-vector
 (defn Schreier-vector
@@ -158,10 +157,6 @@
          [b & bs] base  ; base element
          S sgs
          lvl (:lvl (sgs 0))]  ;; TODO get head of sgs
-    (do 
-      (println "g" g)
-      (println "b" b)
-      (println "lvl" lvl)
     (if (or (empty? g) (nil? b))
       [g lvl]
       (let [x (image g b)  
@@ -174,7 +169,7 @@
           (recur (compose g (inverse cl)) bs
             ; (filter #(> (:lvl %) lvl) S)    
             (subvec S 1)
-            (inc lvl))))))))
+            (inc lvl)))))))
   ([bsgs perm]
    (BSGS-permutation-residue bsgs perm 
       pg/compose pg/inverse Schreier-vector-coset-leader
@@ -220,12 +215,11 @@
            B base-points
            S (-> (clojure.set/map-invert 
                  (into SGS-perms generating-set))
-               (dissoc {}))  ;; remove identity paerm
+               (dissoc {}))  ;; remove identity perms (if any)
            sgs (vector)]
       (if (> l (count B))
         {:base B :sgs sgs}
-        (let [sub-base (if (> l (count B)) 
-                            B (subvec B 0 l))
+        (let [sub-base (if (> l (count B)) B (subvec B 0 l))
               stabilizers (filter 
                             #(pg/pointwise-stabilizer? % sub-base)
                            (keys S))
@@ -237,6 +231,10 @@
               other-points #(pg/moved-points-other-than % sub-base)
                 b (select-base-point (reduce 
                          #(into %1 (other-points %2)) #{} (keys S)))]
+          (println "S" S)
+          (println "base" B)
+          (println "l" l)
+          (println "other-points" other-points)
           (if (and (empty? gens) (not (empty? S)))
             (recur l (conj B b) S sgs)
             (recur (inc l) B 
@@ -246,13 +244,14 @@
                                   (into gens gens-inv))})))))))
     ([base-points SGS-perms generating-set]
      " version that selects base by min " 
-     (partial-BSGS base-points SGS-perms generating-set min)))
+     (partial-BSGS base-points 
+                   SGS-perms generating-set #(apply min %))))
 
 ; compose helper
 (defn- compose-tagged
   [[a g] [b h]]
   " compose helper for perms tagged with word " 
-  (vector (str a b) (pg/compose g h)))
+  (vector (fg/simplify-relations (str a b)) (pg/compose g h)))
 
 ; inverse helper
 (defn- inverse-tagged
@@ -309,15 +308,6 @@
     #(into %1 (Schreier-point->generators 
                 generators sv %2)) #{} (keys sv)))
 
-(defn- extends-Schreier-vector?
-  [sv node from]
-  (and (not (contains? sv node))  ;; node not yet there
-          (contains? sv from))) ;; from is there
-
-(defn- Schreier-vector-chain-stump
-  [b]
-  (hash-map b {:gen nil :from nil}))
-
 ;; build-Scherier-procedure
 (defn build-Scherier-procedure
   [procedure-check-completion
@@ -340,31 +330,49 @@
 (defn- partial-bsgs-insert-generator
   [p-bsgs drop-out new-gens]
   " insert generator at the drop-out " 
-  (let [; new-gens (label-generators generators (:size p-bsgs))
-        old-gens (BSGS-generators p-bsgs drop-out)
+  (let [old-gens (BSGS-generators p-bsgs drop-out)
         index (dec drop-out)
         ; old-sv (get-in p-bsgs [:sgs index :sv])  ;; could use this
         ;; TODO: I believe you have to update the stack in above levels
         ;; results may be incorrect nuow
         update-process-stack 
-          #(update-in % [:process-stack drop-out]  ;; update process-stack
-            into (Schreier-generators (into old-gens new-gens)
-              (get-in % [:sgs index :sv])))
-        ]
+          (fn [m] 
+            (loop [x drop-out
+                   result m]
+              (if (< x drop-out); (= x 0)
+                result 
+                (recur (dec x)
+                  (let [S (Schreier-generators (into old-gens new-gens)
+                            (get-in m [:sgs (dec x) :sv]))]
+                    (update-in result [:process-stack x] into S))))))
+        update-sv-chain
+          (fn [m]
+              (loop [x index
+                     r m]
+                (if (= x 0)
+                  r 
+                  (let [G (BSGS-generators m (inc x))]
+                  (recur (dec x)
+                    (-> r
+                      (update-in [:sgs x :sv]  ;; update-sv
+                         extend-Schreier-vector G)
+                      (assoc-in [:sgs x :gens] G)))))))
+          ]
       (-> p-bsgs
         ;; TODO;; not optmizing out old gens and old orbits yet
         (update-in [:sgs index :sv]  ;; update-sv
            extend-Schreier-vector (into old-gens new-gens))
         (update-in [:sgs index :gens]  ;; update-gens
             into new-gens)
+        (update-sv-chain)
         (assoc :level drop-out)  ;; update level
         ; (update-in [:size] + (count new-gens))  ;; update size
-       (update-process-stack)  ;; update process-stack
+        (update-process-stack)  ;; update process-stack
         )))
 
 ;; Schreier-Sims-initial-state
 (defn Schreier-Sims-initial-state
-  [{:keys [base sgs] :as p-bsgs}]
+  ([{:keys [base sgs] :as p-bsgs} choose-point]
   " gens is a vector of {:lvl , :gens {'a' ..}} " 
   (let 
     [level (count base)
@@ -379,13 +387,14 @@
     {
      :sgs (into [] (map #(assoc %1 :sv (sv-chain %2)) sgs base))
      :base base
-     ; :size 1 
      :level level ; start from bottom
      :process-stack 
        (->> Gstabs (map-indexed #(vector (inc %1) 
          (into clojure.lang.PersistentQueue/EMPTY %2)))
          (into {}))
-     }))
+     :choose choose-point}))
+  ([p-bsgs]
+   (Schreier-Sims-initial-state p-bsgs #(apply min %))))
 
 ;; update-if
 (defn- update-if
@@ -395,20 +404,32 @@
     m 
     (apply x m xs)))
 
+;; Schreier-vector-chain-stump
+(defn- Schreier-vector-chain-stump
+  [b]
+  (hash-map b {:gen nil :from nil}))
+
+;;
+(defn- pair-with-inverse 
+  " returns a hash map of g and g^-1 (if exists) " 
+  [l g]
+  (let [g-inv (pg/inverse g)
+        l-inv (fg/inverse-word l)]
+    (if (= g g-inv)
+      {l g}
+      {l g l-inv g-inv})))
+
 ;; Scherier-Sims-update-after-consumption
 (defn- Scherier-Sims-update-after-consumption 
-  [{:keys [base size] :as p-bsgs} drop-out residue]
+  [{:keys [base size choose] :as p-bsgs} drop-out residue]
   " update the sgs " 
   (if (empty? (second residue))
     p-bsgs  ;; empty residue, do nothing
     (let [extend-base? (> drop-out (count base))
           b (if-not extend-base?  ;; if we are extending the base
               (base (dec drop-out))
-              ; (apply min (pg/moved-points-other-than residue base)))
-              (first (pg/moved-points-other-than (second residue) base)))
-          inv-residue (inverse-tagged residue)]
-      (println "base" base)
-      (println "residue" residue)
+              (choose 
+                (pg/moved-points-other-than (second residue) base))) ]
       (-> p-bsgs 
           (update-if extend-base? update-in 
             [:sgs] conj {:sv (Schreier-vector-chain-stump b)
@@ -417,13 +438,10 @@
           (update-if extend-base? assoc-in [:process-stack drop-out] 
                clojure.lang.PersistentQueue/EMPTY)
           (partial-bsgs-insert-generator drop-out 
-             (apply hash-map 
-                (concat residue 
-                    (when (not= (second residue) (second inv-residue)
-                       inv-residue)))))))))
+             (apply pair-with-inverse residue))))))
 
 ;; Schreier-Sims
-(def Schreier-Sims
+(def Schreier-Sims 
    (letfn 
      [(completion 
        [{:keys [process-stack level]}]
@@ -449,7 +467,8 @@
                   compose-tagged inverse-tagged
                   coset-leader-tagged #(get-in %1 [1 %2] %2))]
          (-> p-bsgs
-           (Scherier-Sims-update-after-consumption drop-out g-res)
+           (Scherier-Sims-update-after-consumption 
+             drop-out g-res)
            (update-in [:process-stack level] pop))))]
 
      (build-Scherier-procedure 

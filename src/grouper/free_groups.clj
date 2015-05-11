@@ -302,3 +302,22 @@
           init (Todd-Coxeter-builder-initial-state generators all-relations)]
       (take-while (comp not nil?) (iterate sm init))))
 
+
+; ;; compute relations
+; ;; TODO maybe move to free groups
+; ;; TODO maybe doesnt work. get rid?
+; (defn generators->relations 
+;   [generators]
+;   " pass in a map of single-character-str labeled generators 
+;       eg. {'a' {2 1, 1 2}, 'b' {3 2, 2 3}, 'c' {4 3, 3 4}} "
+;   (letfn [
+;     (generate-new-items [x result] 
+;       " x = [gen label]  result = {:relations :pool } "
+;       (map #(compose-tagged % x) generators))
+;     (update-result [_ result new-items]
+;       (into result (map first (filter (comp empty? second) new-items))))
+;     (populate-queue [new-items]
+;       (filter (comp not empty? second) new-items))]
+;   ;; eval function
+;   ((co/bfs-builder generate-new-items update-result populate-queue)
+;     [] generators)))
